@@ -1,0 +1,44 @@
+{
+    "kind": "collectionType",
+    "collectionName": "reservations",
+    "info": {
+        "singularName": "reservation",
+        "pluralName": "reservations",
+        "displayName": "Reservation",
+        "description": "予約情報"
+    },
+    "options": {
+        "draftAndPublish": true
+    },
+    "pluginOptions": {},
+    "attributes": {
+        "time": {
+            "type": "string",
+            "required": true
+        },
+        "name": {
+            "type": "string",
+            "required": true
+        },
+        "guests": {
+            "type": "integer",
+            "required": true,
+            "min": 1
+        },
+        "course": {
+            "type": "string"
+        },
+        "phone": {
+            "type": "string"
+        },
+        "email": {
+            "type": "email"
+        },
+        "date": {
+            "type": "date"
+        },
+        "notes": {
+            "type": "text"
+        }
+    }
+}

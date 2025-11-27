@@ -1,0 +1,72 @@
+{
+    "kind": "collectionType",
+    "collectionName": "stores",
+    "info": {
+        "singularName": "store",
+        "pluralName": "stores",
+        "displayName": "Store",
+        "description": "店舗情報"
+    },
+    "options": {
+        "draftAndPublish": true
+    },
+    "pluginOptions": {},
+    "attributes": {
+        "name": {
+            "type": "string",
+            "required": true
+        },
+        "description": {
+            "type": "text"
+        },
+        "statusText": {
+            "type": "string"
+        },
+        "image": {
+            "type": "string"
+        },
+        "websiteUrl": {
+            "type": "string",
+            "required": true
+        },
+        "instagramUrl": {
+            "type": "string"
+        },
+        "googleMapUrl": {
+            "type": "string"
+        },
+        "phoneNumber": {
+            "type": "string"
+        },
+        "snsLink1Label": {
+            "type": "string"
+        },
+        "snsLink1Url": {
+            "type": "string"
+        },
+        "snsLink2Label": {
+            "type": "string"
+        },
+        "snsLink2Url": {
+            "type": "string"
+        },
+        "snsLink3Label": {
+            "type": "string"
+        },
+        "snsLink3Url": {
+            "type": "string"
+        },
+        "snsLink4Label": {
+            "type": "string"
+        },
+        "snsLink4Url": {
+            "type": "string"
+        },
+        "snsLink5Label": {
+            "type": "string"
+        },
+        "snsLink5Url": {
+            "type": "string"
+        }
+    }
+}
