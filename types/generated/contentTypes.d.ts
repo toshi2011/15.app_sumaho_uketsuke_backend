@@ -467,6 +467,39 @@ export interface AdminUser extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiMenuItemMenuItem extends Struct.CollectionTypeSchema {
+  collectionName: 'menu_items';
+  info: {
+    description: '\u5E97\u8217\u306E\u30E1\u30CB\u30E5\u30FC\u9805\u76EE';
+    displayName: 'Menu Item';
+    pluralName: 'menu-items';
+    singularName: 'menu-item';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    description: Schema.Attribute.Text;
+    image: Schema.Attribute.Media<'images'>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::menu-item.menu-item'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    price: Schema.Attribute.Integer;
+    publishedAt: Schema.Attribute.DateTime;
+    store: Schema.Attribute.Relation<'manyToOne', 'api::store.store'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
   collectionName: 'reservations';
   info: {
@@ -553,6 +586,11 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
         number
       > &
       Schema.Attribute.DefaultTo<5>;
+    menuItems: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::menu-item.menu-item'
+    >;
+    menuSheetImages: Schema.Attribute.Media<'images', true>;
     name: Schema.Attribute.String & Schema.Attribute.Required;
     phoneNumber: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
@@ -1083,6 +1121,7 @@ declare module '@strapi/strapi' {
       'admin::transfer-token': AdminTransferToken;
       'admin::transfer-token-permission': AdminTransferTokenPermission;
       'admin::user': AdminUser;
+      'api::menu-item.menu-item': ApiMenuItemMenuItem;
       'api::reservation.reservation': ApiReservationReservation;
       'api::store.store': ApiStoreStore;
       'plugin::content-releases.release': PluginContentReleasesRelease;

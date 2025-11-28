@@ -66,6 +66,20 @@
             "type": "integer",
             "default": 90,
             "min": 30
+        },
+        "menuItems": {
+            "type": "relation",
+            "relation": "oneToMany",
+            "target": "api::menu-item.menu-item",
+            "mappedBy": "store"
+        },
+        "menuSheetImages": {
+            "type": "media",
+            "multiple": true,
+            "required": false,
+            "allowedTypes": [
+                "images"
+            ]
         }
     }
 }
