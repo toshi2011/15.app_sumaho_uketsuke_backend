@@ -1,0 +1,43 @@
+
+> backend@0.1.0 seed:stores
+> ts-node scripts/bulk-import-stores.ts --file=../stores.csv
+
+[2025-11-29 00:45:46.843] [33mwarn[39m: admin.auth.options.expiresIn is deprecated and will be removed in Strapi 6. Please configure admin.auth.sessions.maxRefreshTokenLifespan and admin.auth.sessions.maxSessionLifespan.
+
+ Project information
+
+[90m笏娯楳笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏[39m[90m笏ｬ笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏・[39m
+[90m笏・[39m Time               [90m笏・[39m Sat Nov 29 2025 00:45:46 GMT+0900 (譌･譛ｬ讓呎ｺ匁凾)   [90m笏・[39m
+[90m笏・[39m Launched in        [90m笏・[39m 3355 ms                                          [90m笏・[39m
+[90m笏・[39m Environment        [90m笏・[39m development                                      [90m笏・[39m
+[90m笏・[39m Process PID        [90m笏・[39m 31004                                            [90m笏・[39m
+[90m笏・[39m Version            [90m笏・[39m 5.31.2 (node v20.19.4)                           [90m笏・[39m
+[90m笏・[39m Edition            [90m笏・[39m Enterprise                                       [90m笏・[39m
+[90m笏・[39m Database           [90m笏・[39m sqlite                                           [90m笏・[39m
+[90m笏・[39m Database name      [90m笏・[39m .tmp\data.db                                     [90m笏・[39m
+[90m笏披楳笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏[39m[90m笏ｴ笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏・[39m
+
+ Actions available
+
+Welcome back!
+To manage your project 噫, go to the administration panel at:
+http://localhost:1337/admin
+
+To access the server 笞｡・・ go to:
+http://localhost:1337
+
+[2025-11-29 00:45:47.013] [32minfo[39m: Strapi started successfully
+Strapi started successfully
+Reading CSV file: ../stores.csv
+Found 2 records to process
+Processing [1/2]: Test Store 1
+  Created user: test1@example.com (ID: 1)
+  Created store: Test Store 1 (ID: 12)
+  Commit successful for: Test Store 1
+Processing [2/2]: Test Store 2
+  Created user: test2@example.com (ID: 2)
+  Created store: Test Store 2 (ID: 13)
+  Commit successful for: Test Store 2
+
+Bulk import completed successfully with no errors.
+[2025-11-29 00:45:47.211] [32minfo[39m: Shutting down Strapi

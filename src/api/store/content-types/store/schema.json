@@ -111,6 +111,18 @@
             "allowedTypes": [
                 "images"
             ]
+        },
+        "ownerInfo": {
+            "type": "json"
+        },
+        "digitalPresence": {
+            "type": "json"
+        },
+        "salesLogs": {
+            "type": "relation",
+            "relation": "oneToMany",
+            "target": "api::sales-log.sales-log",
+            "mappedBy": "store"
         }
     }
 }

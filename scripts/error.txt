@@ -1,0 +1,14 @@
+
+> backend@0.1.0 seed:stores
+> ts-node scripts/bulk-import-stores.ts --file=../stores.csv
+
+Fatal error: TypeError: Cannot destructure property 'client' of 'db.config.connection' as it is undefined.
+    at Object.getDialect (E:\15.app_sumaho_uketsuke\backend\node_modules\@strapi\database\src\dialects\index.ts:40:11)
+    at new Database (E:\15.app_sumaho_uketsuke\backend\node_modules\@strapi\database\src\index.ts:86:20)
+    at resolver (E:\15.app_sumaho_uketsuke\backend\node_modules\@strapi\core\src\Strapi.ts:286:16)
+    at Strapi.get (E:\15.app_sumaho_uketsuke\backend\node_modules\@strapi\core\src\container.ts:27:35)
+    at Strapi.db (E:\15.app_sumaho_uketsuke\backend\node_modules\@strapi\core\src\Strapi.ts:82:17)
+    at Object.register (E:\15.app_sumaho_uketsuke\backend\node_modules\@strapi\core\src\providers\registries.ts:38:12)
+    at async Strapi.register (E:\15.app_sumaho_uketsuke\backend\node_modules\@strapi\core\src\Strapi.ts:413:7)
+    at async Strapi.load (E:\15.app_sumaho_uketsuke\backend\node_modules\@strapi\core\src\Strapi.ts:400:5)
+    at async main (E:\15.app_sumaho_uketsuke\backend\scripts\bulk-import-stores.ts:13:9)

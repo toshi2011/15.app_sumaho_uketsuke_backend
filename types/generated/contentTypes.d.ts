@@ -543,6 +543,42 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiSalesLogSalesLog extends Struct.CollectionTypeSchema {
+  collectionName: 'sales_logs';
+  info: {
+    description: '\u55B6\u696D\u6D3B\u52D5\u5C65\u6B74';
+    displayName: 'Sales Log';
+    pluralName: 'sales-logs';
+    singularName: 'sales-log';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    action: Schema.Attribute.Enumeration<['DM', 'Call', 'Visit']> &
+      Schema.Attribute.Required;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    date: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::sales-log.sales-log'
+    > &
+      Schema.Attribute.Private;
+    note: Schema.Attribute.Text;
+    publishedAt: Schema.Attribute.DateTime;
+    result: Schema.Attribute.Enumeration<
+      ['NoAnswer', 'Good', 'Bad', 'Contract']
+    >;
+    store: Schema.Attribute.Relation<'manyToOne', 'api::store.store'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiStoreStore extends Struct.CollectionTypeSchema {
   collectionName: 'stores';
   info: {
@@ -555,7 +591,9 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
     draftAndPublish: true;
   };
   attributes: {
+    address: Schema.Attribute.String;
     branding: Schema.Attribute.JSON;
+    businessHours: Schema.Attribute.JSON;
     coverImage: Schema.Attribute.Media<'images'>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -568,6 +606,8 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
         number
       > &
       Schema.Attribute.DefaultTo<90>;
+    description: Schema.Attribute.Text;
+    digitalPresence: Schema.Attribute.JSON;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::store.store'> &
       Schema.Attribute.Private;
@@ -594,7 +634,15 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
     >;
     menuSheetImages: Schema.Attribute.Media<'images', true>;
     name: Schema.Attribute.String & Schema.Attribute.Required;
+    ownerInfo: Schema.Attribute.JSON;
+    phoneNumber: Schema.Attribute.String;
+    postalCode: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
+    salesLogs: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::sales-log.sales-log'
+    >;
+    snsLink1Label: Schema.Attribute.String;
     snsLink1Url: Schema.Attribute.String;
     snsLink2Label: Schema.Attribute.String;
     snsLink2Url: Schema.Attribute.String;
@@ -1124,6 +1172,7 @@ declare module '@strapi/strapi' {
       'admin::user': AdminUser;
       'api::menu-item.menu-item': ApiMenuItemMenuItem;
       'api::reservation.reservation': ApiReservationReservation;
+      'api::sales-log.sales-log': ApiSalesLogSalesLog;
       'api::store.store': ApiStoreStore;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;
