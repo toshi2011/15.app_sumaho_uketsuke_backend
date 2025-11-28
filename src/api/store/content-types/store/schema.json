@@ -22,6 +22,9 @@
         "phoneNumber": {
             "type": "string"
         },
+        "postalCode": {
+            "type": "string"
+        },
         "address": {
             "type": "string"
         },

@@ -555,9 +555,7 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
     draftAndPublish: true;
   };
   attributes: {
-    address: Schema.Attribute.String;
     branding: Schema.Attribute.JSON;
-    businessHours: Schema.Attribute.JSON;
     coverImage: Schema.Attribute.Media<'images'>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -570,7 +568,6 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
         number
       > &
       Schema.Attribute.DefaultTo<90>;
-    description: Schema.Attribute.Text;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::store.store'> &
       Schema.Attribute.Private;
@@ -597,9 +594,7 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
     >;
     menuSheetImages: Schema.Attribute.Media<'images', true>;
     name: Schema.Attribute.String & Schema.Attribute.Required;
-    phoneNumber: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
-    snsLink1Label: Schema.Attribute.String;
     snsLink1Url: Schema.Attribute.String;
     snsLink2Label: Schema.Attribute.String;
     snsLink2Url: Schema.Attribute.String;
