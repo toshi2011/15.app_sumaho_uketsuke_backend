@@ -22,6 +22,12 @@
         "phoneNumber": {
             "type": "string"
         },
+        "address": {
+            "type": "string"
+        },
+        "businessHours": {
+            "type": "json"
+        },
         "snsLink1Label": {
             "type": "string"
         },
@@ -76,6 +82,28 @@
         "menuSheetImages": {
             "type": "media",
             "multiple": true,
+            "required": false,
+            "allowedTypes": [
+                "images"
+            ]
+        },
+        "socialLinks": {
+            "type": "json"
+        },
+        "branding": {
+            "type": "json"
+        },
+        "logoImage": {
+            "type": "media",
+            "multiple": false,
+            "required": false,
+            "allowedTypes": [
+                "images"
+            ]
+        },
+        "coverImage": {
+            "type": "media",
+            "multiple": false,
             "required": false,
             "allowedTypes": [
                 "images"
