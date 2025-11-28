@@ -525,13 +525,34 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    defaultDuration: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 30;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<90>;
     description: Schema.Attribute.Text;
-    googleMapUrl: Schema.Attribute.String;
-    image: Schema.Attribute.String;
-    instagramUrl: Schema.Attribute.String;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::store.store'> &
       Schema.Attribute.Private;
+    maxCapacity: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 1;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<20>;
+    maxGroupsPerSlot: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 1;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<5>;
     name: Schema.Attribute.String & Schema.Attribute.Required;
     phoneNumber: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
@@ -545,11 +566,9 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
     snsLink4Url: Schema.Attribute.String;
     snsLink5Label: Schema.Attribute.String;
     snsLink5Url: Schema.Attribute.String;
-    statusText: Schema.Attribute.String;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    websiteUrl: Schema.Attribute.String & Schema.Attribute.Required;
   };
 }
 

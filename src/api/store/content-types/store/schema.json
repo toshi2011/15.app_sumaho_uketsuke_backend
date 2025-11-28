@@ -19,22 +19,6 @@
         "description": {
             "type": "text"
         },
-        "statusText": {
-            "type": "string"
-        },
-        "image": {
-            "type": "string"
-        },
-        "websiteUrl": {
-            "type": "string",
-            "required": true
-        },
-        "instagramUrl": {
-            "type": "string"
-        },
-        "googleMapUrl": {
-            "type": "string"
-        },
         "phoneNumber": {
             "type": "string"
         },
@@ -67,6 +51,21 @@
         },
         "snsLink5Url": {
             "type": "string"
+        },
+        "maxCapacity": {
+            "type": "integer",
+            "default": 20,
+            "min": 1
+        },
+        "maxGroupsPerSlot": {
+            "type": "integer",
+            "default": 5,
+            "min": 1
+        },
+        "defaultDuration": {
+            "type": "integer",
+            "default": 90,
+            "min": 30
         }
     }
 }
