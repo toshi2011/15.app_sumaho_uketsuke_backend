@@ -1,0 +1,6 @@
+name,email,phoneNumber,address,description,logo_path,cover_path,gender,age_range,platforms,category
+カフェ・ド・パリ,cafe.paris@example.com,03-5555-1001,東京都渋谷区神南1-2-3,本格フレンチカフェ。自家製パンとコーヒーが自慢です。,,,女性,30代,instagram,cafe
+美容室サロン・エレガンス,salon.elegance@example.com,03-5555-2002,東京都港区青山2-3-4,最新トレンドのヘアスタイルをご提案します。,,,女性,40代,instagram,salon
+イタリアン・トラットリア,trattoria@example.com,03-5555-3003,東京都新宿区歌舞伎町1-4-5,本場イタリアの味をお届けします。,,,男性,50代,tabelog,restaurant
+ネイルサロン・ビューティー,nail.beauty@example.com,03-5555-4004,東京都中央区銀座3-5-6,丁寧な施術で美しい指先を演出します。,,,女性,20代,instagram,salon
+和カフェ・さくら,wacafe.sakura@example.com,03-5555-5005,東京都台東区浅草2-6-7,抹茶スイーツと和の空間でほっと一息。,,,女性,30代,instagram,cafe

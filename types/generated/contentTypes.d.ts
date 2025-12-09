@@ -592,6 +592,7 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
   };
   attributes: {
     address: Schema.Attribute.String;
+    adminToken: Schema.Attribute.String & Schema.Attribute.Private;
     branding: Schema.Attribute.JSON;
     businessHours: Schema.Attribute.JSON;
     coverImage: Schema.Attribute.Media<'images'>;
@@ -653,6 +654,10 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
     snsLink5Label: Schema.Attribute.String;
     snsLink5Url: Schema.Attribute.String;
     socialLinks: Schema.Attribute.JSON;
+    status: Schema.Attribute.Enumeration<
+      ['LEAD', 'CONTACTED', 'TRIAL', 'REJECTED', 'DORMANT', 'ACTIVE']
+    > &
+      Schema.Attribute.DefaultTo<'LEAD'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;

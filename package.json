@@ -21,11 +21,14 @@
     "@strapi/strapi": "5.31.2",
     "better-sqlite3": "12.4.1",
     "csv-parse": "^6.1.0",
+    "csv-parser": "^3.2.0",
     "mime-types": "^3.0.2",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "react-router-dom": "^6.0.0",
-    "styled-components": "^6.0.0"
+    "stripe": "^20.0.0",
+    "styled-components": "^6.0.0",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@types/mime-types": "^3.0.1",

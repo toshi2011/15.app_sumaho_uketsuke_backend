@@ -16,6 +16,22 @@
             "type": "string",
             "required": true
         },
+        "status": {
+            "type": "enumeration",
+            "enum": [
+                "LEAD",
+                "CONTACTED",
+                "TRIAL",
+                "REJECTED",
+                "DORMANT",
+                "ACTIVE"
+            ],
+            "default": "LEAD"
+        },
+        "adminToken": {
+            "type": "string",
+            "private": true
+        },
         "description": {
             "type": "text"
         },
