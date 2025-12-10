@@ -20,10 +20,10 @@ jobs:
       - name: Get new md files
         id: changed
         run: |
-          # 新規追加されたファイルのみ取得
           files=$(git diff --name-only --diff-filter=A HEAD~1 HEAD -- 'note/issues/*.md' 2>/dev/null || echo "")
-          echo "files=$files" >> $GITHUB_OUTPUT
-          echo "Found files: $files"
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          echo "$files" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
       
       - name: Create Issues
         if: steps.changed.outputs.files != ''
@@ -31,16 +31,16 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const files = `${{ steps.changed.outputs.files }}`.trim().split('\n').filter(f => f);
+            const filesRaw = process.env.FILES || '';
+            const files = filesRaw.trim().split('\n').filter(f => f);
             
             for (const file of files) {
               if (!file) continue;
               
               try {
                 const content = fs.readFileSync(file, 'utf8');
-                const filename = file.split('/').pop().replace('.md', '');
-                
-                // ファイル名をタイトルに（先頭の番号や記号を整理）
+                const parts = file.split('/');
+                const filename = parts[parts.length - 1].replace('.md', '');
                 const title = filename;
                 
                 const issue = await github.rest.issues.create({
@@ -50,8 +50,10 @@ jobs:
                   body: content
                 });
                 
-                console.log(`✅ Created issue: ${issue.data.html_url}`);
+                console.log('Created issue: ' + issue.data.html_url);
               } catch (error) {
-                console.error(`❌ Failed to create issue from ${file}:`, error.message);
+                console.error('Failed to create issue from ' + file + ': ' + error.message);
               }
             }
+        env:
+          FILES: ${{ steps.changed.outputs.files }}
