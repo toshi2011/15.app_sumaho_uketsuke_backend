@@ -4,7 +4,7 @@ on:
   push:
     paths:
       - 'note/issues/*.md'
-  workflow_dispatch:  # 手動実行も可能に
+  workflow_dispatch:
 
 jobs:
   create-issue:
@@ -21,6 +21,9 @@ jobs:
       - name: Get changed md files
         id: changed
         run: |
+          # 日本語ファイル名を正しく扱う
+          git config core.quotepath false
+          
           if git rev-parse HEAD~1 >/dev/null 2>&1; then
             files=$(git diff --name-only HEAD~1 HEAD -- 'note/issues/*.md' || echo "")
           else
@@ -38,12 +41,12 @@ jobs:
           script: |
             const fs = require('fs');
             const filesRaw = process.env.FILES || '';
-            const files = filesRaw.trim().split('\n').filter(f => f);
+            const files = filesRaw.trim().split('\n').filter(f => f && !f.startsWith('"'));
             
             console.log('Processing files:', files);
             
             if (files.length === 0) {
-              console.log('No files to process');
+              console.log('No valid files to process');
               return;
             }
             
@@ -67,7 +70,7 @@ jobs:
                 
                 console.log('Created issue: ' + issue.data.html_url);
               } catch (error) {
-                console.error('Failed to create issue from ' + file + ': ' + error.message);
+                console.error('Failed: ' + error.message);
               }
             }
         env:
