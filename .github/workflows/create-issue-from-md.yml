@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'note/issues/*.md'
+  workflow_dispatch:  # 手動実行も可能に
 
 jobs:
   create-issue:
@@ -15,12 +16,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
       
-      - name: Get new md files
+      - name: Get changed md files
         id: changed
         run: |
-          files=$(git diff --name-only --diff-filter=A HEAD~1 HEAD -- 'note/issues/*.md' 2>/dev/null || echo "")
+          if git rev-parse HEAD~1 >/dev/null 2>&1; then
+            files=$(git diff --name-only HEAD~1 HEAD -- 'note/issues/*.md' || echo "")
+          else
+            files=$(find note/issues -name "*.md" 2>/dev/null || echo "")
+          fi
+          echo "Detected files: $files"
           echo "files<<EOF" >> $GITHUB_OUTPUT
           echo "$files" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -34,6 +40,13 @@ jobs:
             const filesRaw = process.env.FILES || '';
             const files = filesRaw.trim().split('\n').filter(f => f);
             
+            console.log('Processing files:', files);
+            
+            if (files.length === 0) {
+              console.log('No files to process');
+              return;
+            }
+            
             for (const file of files) {
               if (!file) continue;
               
@@ -42,6 +55,8 @@ jobs:
                 const parts = file.split('/');
                 const filename = parts[parts.length - 1].replace('.md', '');
                 const title = filename;
+                
+                console.log('Creating issue: ' + title);
                 
                 const issue = await github.rest.issues.create({
                   owner: context.repo.owner,
