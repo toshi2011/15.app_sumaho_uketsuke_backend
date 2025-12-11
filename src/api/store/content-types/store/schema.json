@@ -139,6 +139,32 @@
             "relation": "oneToMany",
             "target": "api::sales-log.sales-log",
             "mappedBy": "store"
+        },
+        "reservations": {
+            "type": "relation",
+            "relation": "oneToMany",
+            "target": "api::reservation.reservation",
+            "mappedBy": "store"
+        },
+        "tables": {
+            "type": "relation",
+            "relation": "oneToMany",
+            "target": "api::table.table",
+            "mappedBy": "store"
+        },
+        "customers": {
+            "type": "relation",
+            "relation": "oneToMany",
+            "target": "api::customer.customer",
+            "mappedBy": "store"
+        },
+        "lineChannelAccessToken": {
+            "type": "text",
+            "private": true
+        },
+        "lineUserId": {
+            "type": "string",
+            "private": true
         }
     }
 }

@@ -467,6 +467,52 @@ export interface AdminUser extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiCustomerCustomer extends Struct.CollectionTypeSchema {
+  collectionName: 'customers';
+  info: {
+    description: '\u9867\u5BA2\u30DE\u30B9\u30BF\uFF08CRM\u7528\uFF09';
+    displayName: 'Customer';
+    pluralName: 'customers';
+    singularName: 'customer';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    email: Schema.Attribute.Email;
+    lastVisitDate: Schema.Attribute.Date;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::customer.customer'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    notes: Schema.Attribute.Text;
+    phone: Schema.Attribute.String;
+    publishedAt: Schema.Attribute.DateTime;
+    reservations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::reservation.reservation'
+    >;
+    store: Schema.Attribute.Relation<'manyToOne', 'api::store.store'>;
+    totalVisits: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiMenuItemMenuItem extends Struct.CollectionTypeSchema {
   collectionName: 'menu_items';
   info: {
@@ -503,21 +549,32 @@ export interface ApiMenuItemMenuItem extends Struct.CollectionTypeSchema {
 export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
   collectionName: 'reservations';
   info: {
-    description: '\u4E88\u7D04\u60C5\u5831';
+    description: '\u4E88\u7D04\u60C5\u5831\uFF08\u8A73\u7D30\u30E2\u30FC\u30C9\u5BFE\u5FDC\uFF09';
     displayName: 'Reservation';
     pluralName: 'reservations';
     singularName: 'reservation';
   };
   options: {
-    draftAndPublish: true;
+    draftAndPublish: false;
   };
   attributes: {
+    assignedTables: Schema.Attribute.Relation<'manyToMany', 'api::table.table'>;
     course: Schema.Attribute.String;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    date: Schema.Attribute.Date;
+    customer: Schema.Attribute.Relation<'manyToOne', 'api::customer.customer'>;
+    date: Schema.Attribute.Date & Schema.Attribute.Required;
+    duration: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 15;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<120>;
     email: Schema.Attribute.Email;
+    guestName: Schema.Attribute.String & Schema.Attribute.Required;
     guests: Schema.Attribute.Integer &
       Schema.Attribute.Required &
       Schema.Attribute.SetMinMax<
@@ -526,16 +583,29 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
         },
         number
       >;
+    isOwnerEntry: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    language: Schema.Attribute.Enumeration<['ja', 'en', 'zh', 'ko']> &
+      Schema.Attribute.DefaultTo<'ja'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
       'api::reservation.reservation'
     > &
       Schema.Attribute.Private;
-    name: Schema.Attribute.String & Schema.Attribute.Required;
     notes: Schema.Attribute.Text;
+    ownerNote: Schema.Attribute.Text;
+    ownerReply: Schema.Attribute.Text;
     phone: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
+    requiresAttention: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    reservationNumber: Schema.Attribute.String & Schema.Attribute.Unique;
+    status: Schema.Attribute.Enumeration<
+      ['pending', 'confirmed', 'rejected', 'cancelled', 'no_show']
+    > &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'pending'>;
+    store: Schema.Attribute.Relation<'manyToOne', 'api::store.store'>;
     time: Schema.Attribute.String & Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -599,6 +669,7 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    customers: Schema.Attribute.Relation<'oneToMany', 'api::customer.customer'>;
     defaultDuration: Schema.Attribute.Integer &
       Schema.Attribute.SetMinMax<
         {
@@ -609,6 +680,8 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
       Schema.Attribute.DefaultTo<90>;
     description: Schema.Attribute.Text;
     digitalPresence: Schema.Attribute.JSON;
+    lineChannelAccessToken: Schema.Attribute.Text & Schema.Attribute.Private;
+    lineUserId: Schema.Attribute.String & Schema.Attribute.Private;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::store.store'> &
       Schema.Attribute.Private;
@@ -639,6 +712,10 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
     phoneNumber: Schema.Attribute.String;
     postalCode: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
+    reservations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::reservation.reservation'
+    >;
     salesLogs: Schema.Attribute.Relation<
       'oneToMany',
       'api::sales-log.sales-log'
@@ -658,6 +735,48 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
       ['LEAD', 'CONTACTED', 'TRIAL', 'REJECTED', 'DORMANT', 'ACTIVE']
     > &
       Schema.Attribute.DefaultTo<'LEAD'>;
+    tables: Schema.Attribute.Relation<'oneToMany', 'api::table.table'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiTableTable extends Struct.CollectionTypeSchema {
+  collectionName: 'tables';
+  info: {
+    description: '\u5E97\u8217\u306E\u30C6\u30FC\u30D6\u30EB/\u5E2D\u60C5\u5831';
+    displayName: 'Table';
+    pluralName: 'tables';
+    singularName: 'table';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    capacity: Schema.Attribute.Integer &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 1;
+        },
+        number
+      >;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    description: Schema.Attribute.Text;
+    isActive: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<true>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<'oneToMany', 'api::table.table'> &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    publishedAt: Schema.Attribute.DateTime;
+    reservations: Schema.Attribute.Relation<
+      'manyToMany',
+      'api::reservation.reservation'
+    >;
+    store: Schema.Attribute.Relation<'manyToOne', 'api::store.store'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -1175,10 +1294,12 @@ declare module '@strapi/strapi' {
       'admin::transfer-token': AdminTransferToken;
       'admin::transfer-token-permission': AdminTransferTokenPermission;
       'admin::user': AdminUser;
+      'api::customer.customer': ApiCustomerCustomer;
       'api::menu-item.menu-item': ApiMenuItemMenuItem;
       'api::reservation.reservation': ApiReservationReservation;
       'api::sales-log.sales-log': ApiSalesLogSalesLog;
       'api::store.store': ApiStoreStore;
+      'api::table.table': ApiTableTable;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;
       'plugin::i18n.locale': PluginI18NLocale;
