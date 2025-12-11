@@ -136,3 +136,5 @@ build
 
 note/.obsidian/
 note/issue_watcher.py
+
+backend/note/issues/起票済/
