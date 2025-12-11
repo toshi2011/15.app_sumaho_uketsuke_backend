@@ -546,6 +546,45 @@ export interface ApiMenuItemMenuItem extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiOwnerSessionOwnerSession
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'owner_sessions';
+  info: {
+    description: '\u5E97\u4E3B\u30A2\u30D7\u30EA\u30BB\u30C3\u30B7\u30E7\u30F3\u7BA1\u7406';
+    displayName: 'Owner Session';
+    pluralName: 'owner-sessions';
+    singularName: 'owner-session';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    deviceId: Schema.Attribute.String;
+    endedAt: Schema.Attribute.DateTime;
+    isActive: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<true>;
+    lastCheckedAt: Schema.Attribute.DateTime;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::owner-session.owner-session'
+    > &
+      Schema.Attribute.Private;
+    platform: Schema.Attribute.String;
+    publishedAt: Schema.Attribute.DateTime;
+    sessionId: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Unique;
+    startedAt: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    store: Schema.Attribute.Relation<'manyToOne', 'api::store.store'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
   collectionName: 'reservations';
   info: {
@@ -1296,6 +1335,7 @@ declare module '@strapi/strapi' {
       'admin::user': AdminUser;
       'api::customer.customer': ApiCustomerCustomer;
       'api::menu-item.menu-item': ApiMenuItemMenuItem;
+      'api::owner-session.owner-session': ApiOwnerSessionOwnerSession;
       'api::reservation.reservation': ApiReservationReservation;
       'api::sales-log.sales-log': ApiSalesLogSalesLog;
       'api::store.store': ApiStoreStore;
