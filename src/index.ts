@@ -65,11 +65,33 @@ export default {
 
         const existingActions = permissions.map((p) => p.action);
         const actionsToAdd = [
+          // Store APIs
           'api::store.store.find',
           'api::store.store.findOne',
           'api::store.store.update',
           'api::store.store.checkAvailability',
+          // Reservation APIs
           'api::reservation.reservation.create',
+          'api::reservation.reservation.find',
+          'api::reservation.reservation.update',
+          // Owner Session APIs (for PWA business start)
+          'api::owner-session.owner-session.create',
+          'api::owner-session.owner-session.find',
+          'api::owner-session.owner-session.update',
+          // Owner Notification APIs (for PWA polling)
+          'api::owner-notification.owner-notification.check',
+          // Owner Reservation APIs (for status updates)
+          'api::owner-reservation.owner-reservation.list',
+          'api::owner-reservation.owner-reservation.updateStatus',
+          // Public Reservation APIs
+          'api::public-reservation.public-reservation.create',
+          'api::public-reservation.public-reservation.findByNumber',
+          // Table APIs (for table management)
+          'api::table.table.find',
+          'api::table.table.findOne',
+          'api::table.table.create',
+          'api::table.table.update',
+          'api::table.table.delete',
         ].filter((action) => !existingActions.includes(action));
 
         if (actionsToAdd.length > 0) {

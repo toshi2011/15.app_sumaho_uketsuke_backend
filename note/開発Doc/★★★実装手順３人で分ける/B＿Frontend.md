@@ -149,3 +149,110 @@
 - `lib/api.ts` - getCustomerHistory()追加
 - `components/admin/ReservationDetailModal.tsx` - CRM情報統合
 - `components/admin/DashboardClient.tsx` - storeId渡し
+
+
+
+20251212
+
+**FE-206 実装完了 ✅**
+
+## 実装サマリー
+
+### Task 1: Reservation Wizard (Frontend) ✅
+
+|項目|状態|
+|---|---|
+|Language Switcher (JP/EN)|✅ `LanguageSwitcher.tsx`|
+|Translated labels|✅ `lib/i18n.ts` - 全UI文字列|
+|Translated error messages|✅ Japanese & English|
+|Pass language to Backend API|✅ `CreateReservationRequest.language`|
+
+### Task 2: Email Templates (Infra) ✅
+
+|項目|状態|
+|---|---|
+|`templates/email/ja/` folder|✅ 作成済み|
+|`templates/email/en/` folder|✅ 作成済み|
+|`reservation_confirmed.html` (JA)|✅|
+|`reservation_pending.html` (JA)|✅|
+|`reservation_confirmed.html` (EN)|✅|
+|`reservation_pending.html` (EN)|✅|
+|Email utility functions|✅ `lib/email.ts`|
+
+### Task 3: Owner Dashboard ✅
+
+|項目|状態|
+|---|---|
+|Language display in modal|✅ 🇬🇧 English / 🇯🇵 日本語|
+|Globe icon|✅ `lucide-react`|
+
+## 新規作成ファイル
+
+- `lib/i18n.ts` - 翻訳システム
+- `lib/email.ts` - メールテンプレートユーティリティ
+- `components/LanguageSwitcher.tsx` - 言語切り替えUI
+- `templates/email/ja/reservation_confirmed.html`
+- `templates/email/ja/reservation_pending.html`
+- `templates/email/en/reservation_confirmed.html`
+- `templates/email/en/reservation_pending.html`
+- `docs/FE-206-IMPLEMENTATION-SUMMARY.md`
+
+## 更新ファイル
+
+- `types/index.ts` - `language` フィールド追加
+- `components/ReservationWizard.tsx` - 多言語対応
+- `components/admin/ReservationDetailModal.tsx` - 言語表示追加
+
+
+
+**FE-207 実装完了 ✅**
+
+## 実装サマリー
+
+### Task 1: Table List View ✅
+
+|項目|状態|
+|---|---|
+|テーブル一覧表示|✅ カード形式リスト|
+|テーブル名と定員表示|✅ 「テーブルA (4名)」形式|
+|有効/無効ステータス|✅ トグルアイコンで表示|
+|総席数サマリー|✅ ヘッダーに表示|
+|空状態の表示|✅ 登録を促すメッセージ|
+
+### Task 2: Edit/Add Modal ✅
+
+|項目|状態|
+|---|---|
+|新規追加モーダル|✅|
+|編集モーダル|✅|
+|テーブル名入力|✅ バリデーション付き|
+|定員入力|✅ +/- ボタン & プリセット|
+|有効/無効トグル|✅|
+|削除確認モーダル|✅ 警告メッセージ付き|
+
+### Task 3: API Integration ✅
+
+|API|状態|
+|---|---|
+|GET /api/tables|✅ `getTables(storeId)`|
+|POST /api/tables|✅ `createTable(request)`|
+|PUT /api/tables/{id}|✅ `updateTable(id, request)`|
+|DELETE /api/tables/{id}|✅ `deleteTable(id)`|
+
+## 新規作成ファイル
+
+- `app/admin/tables/page.tsx` - テーブル管理ページ
+- `docs/FE-207-IMPLEMENTATION-SUMMARY.md` - 実装ドキュメント
+
+## 更新ファイル
+
+- `lib/api.ts` - テーブルCRUD API関数追加
+- `components/admin/BottomNav.tsx` - テーブル管理へのリンク追加
+
+## UI特徴
+
+- カード形式のリスト表示（シンプル、タッチフレンドリー）
+- クイックトグルで有効/無効切り替え
+- 定員プリセットボタン（2/4/6/8名）
+- 削除前の確認モーダル
+- ローディング状態とエラーメッセージ
