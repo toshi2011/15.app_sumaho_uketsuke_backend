@@ -8,8 +8,15 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as nodemailer from 'nodemailer';
 
-// サンプルデータ
-const sampleData = {
+// テンプレート別の店主メッセージサンプル
+const ownerReplyByTemplate: Record<string, string> = {
+    reservation_pending: '', // 仮受付時は店主メッセージなし
+    reservation_confirmed: 'ご予約ありがとうございます。窓際のお席をご用意いたしました。当日お待ちしております。',
+    reservation_rejected: '誠に申し訳ございませんが、ご希望の日時は既に満席となっております。別の日程でのご予約をお待ちしております。',
+};
+
+// 基本サンプルデータ
+const createSampleData = (templateName: string) => ({
     reservation: {
         reservationNumber: 'R-20251212-TEST',
         guestName: 'テスト太郎',
@@ -20,12 +27,14 @@ const sampleData = {
         time: '19:00',
         duration: 120,
         guests: 4,
-        status: 'confirmed',
-        statusLabel: '確定',
+        status: templateName === 'reservation_confirmed' ? 'confirmed' :
+            templateName === 'reservation_rejected' ? 'rejected' : 'pending',
+        statusLabel: templateName === 'reservation_confirmed' ? '確定' :
+            templateName === 'reservation_rejected' ? '拒否' : '仮受付',
         course: 'クリスマスディナーコース',
         notes: 'アレルギー：卵\n窓際の席希望',
-        ownerReply: 'ご予約ありがとうございます。窓際のお席をご用意いたしました。当日お待ちしております。',
-        assignedTablesText: 'A-1席、A-2席',
+        ownerReply: ownerReplyByTemplate[templateName] || '',
+        assignedTablesText: templateName === 'reservation_confirmed' ? 'A-1席、A-2席' : '',
         requiresAttention: false,
     },
     store: {
@@ -35,7 +44,7 @@ const sampleData = {
     },
     currentYear: new Date().getFullYear(),
     cancellationUrl: 'https://example.com/cancel/test123',
-};
+});
 
 // テンプレートを読み込み
 const loadTemplate = (templateName: string, language: string = 'ja'): string | null => {
@@ -81,13 +90,14 @@ export default {
             return ctx.notFound(`Template not found: ${template}`);
         }
 
-        // カスタムデータでオーバーライド
+        // テンプレートに応じたサンプルデータを生成
+        const sampleData = createSampleData(template);
         const customData = {
             ...sampleData,
             reservation: {
                 ...sampleData.reservation,
                 guestName: guestName || sampleData.reservation.guestName,
-                ownerReply: ownerReply || sampleData.reservation.ownerReply,
+                ownerReply: ownerReply !== undefined ? ownerReply : sampleData.reservation.ownerReply,
                 status: status || sampleData.reservation.status,
             },
         };
@@ -135,7 +145,8 @@ export default {
             return ctx.notFound(`Template not found: ${template}`);
         }
 
-        // データをマージ
+        // テンプレートに応じたサンプルデータを生成してマージ
+        const sampleData = createSampleData(template);
         const mergedData = {
             ...sampleData,
             reservation: {

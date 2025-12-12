@@ -117,3 +117,35 @@
 - `components/admin/DashboardClient.tsx` - モーダル統合、3タブ化
 - `lib/api.ts` - JWT認証ヘッダー追加
 
+
+**FE-204 & FE-205 実装完了 ✅**
+
+## FE-204: CRM Info in Reservation Detail
+
+|Task|状態|
+|---|---|
+|1. Badge display (🔰New, ⭐Regular, 👑VIP)|✅ `CustomerBadge` コンポーネント|
+|2. Cancel history alert (赤字表示)|✅ 「過去キャンセル: X回 / ノーショー: X回」|
+|3. Past notes history section|✅ 展開可能な「過去の履歴」セクション|
+|4. Allergy info display|✅ アレルギー情報・好み・嗜好を表示|
+|API: getCustomerHistory()|✅ `lib/api.ts` に追加|
+
+## FE-205: Error Handling & UX Polish
+
+| Task                             | 状態                                          |
+| -------------------------------- | ------------------------------------------- |
+| 1. Offline banner                | ✅ `OfflineBanner.tsx` - 「インターネットに接続されていません」 |
+| 2. Loading states with spinner   | ✅ 承認/却下ボタンにスピナー追加                           |
+| 3. Sound test button in settings | ✅ `SoundTestButton.tsx` + 設定ページ「通知設定」タブ     |
+| Animation styles                 | ✅ `globals.css` に `slideDown`, `spin` 追加    |
+**新規作成ファイル:**
+
+- `components/OfflineBanner.tsx`
+- `components/admin/SoundTestButton.tsx`
+
+**更新ファイル:**
+
+- `types/index.ts` - CustomerHistory型追加
+- `lib/api.ts` - getCustomerHistory()追加
+- `components/admin/ReservationDetailModal.tsx` - CRM情報統合
+- `components/admin/DashboardClient.tsx` - storeId渡し

@@ -746,6 +746,14 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
       'api::menu-item.menu-item'
     >;
     menuSheetImages: Schema.Attribute.Media<'images', true>;
+    minBookingLeadTime: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<180>;
     name: Schema.Attribute.String & Schema.Attribute.Required;
     ownerInfo: Schema.Attribute.JSON;
     phoneNumber: Schema.Attribute.String;

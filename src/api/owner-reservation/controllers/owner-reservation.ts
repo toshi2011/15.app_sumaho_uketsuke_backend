@@ -60,38 +60,55 @@ export default {
             // 総件数を取得
             const total = await strapi.db.query('api::reservation.reservation').count({ where });
 
+            // BE-104: 各予約に対してcustomerStatsを取得
+            const dataWithStats = await Promise.all(
+                reservations.map(async (r) => {
+                    // 電話番号がある場合は履歴を検索
+                    let customerStats = null;
+                    if (r.phone) {
+                        customerStats = await strapi.service('api::customer.customer-stats').getCustomerStats(
+                            r.phone,
+                            storeId
+                        );
+                    }
+
+                    return {
+                        id: r.documentId,
+                        reservationNumber: r.reservationNumber,
+                        guestName: r.guestName,
+                        email: r.email,
+                        phone: r.phone,
+                        date: r.date,
+                        time: r.time,
+                        duration: r.duration,
+                        guests: r.guests,
+                        status: r.status,
+                        course: r.course,
+                        notes: r.notes,
+                        ownerNote: r.ownerNote,
+                        ownerReply: r.ownerReply,
+                        requiresAttention: r.requiresAttention,
+                        isOwnerEntry: r.isOwnerEntry,
+                        assignedTables: r.assignedTables?.map((t: any) => ({
+                            id: t.documentId,
+                            name: t.name,
+                            capacity: t.capacity,
+                        })) || [],
+                        customer: r.customer ? {
+                            id: r.customer.documentId,
+                            name: r.customer.name,
+                            totalVisits: r.customer.totalVisits,
+                        } : null,
+                        customerStats,
+                        createdAt: r.createdAt,
+                        updatedAt: r.updatedAt,
+                    };
+                })
+            );
+
             ctx.body = {
                 success: true,
-                data: reservations.map((r) => ({
-                    id: r.documentId,
-                    reservationNumber: r.reservationNumber,
-                    guestName: r.guestName,
-                    email: r.email,
-                    phone: r.phone,
-                    date: r.date,
-                    time: r.time,
-                    duration: r.duration,
-                    guests: r.guests,
-                    status: r.status,
-                    course: r.course,
-                    notes: r.notes,
-                    ownerNote: r.ownerNote,
-                    ownerReply: r.ownerReply,
-                    requiresAttention: r.requiresAttention,
-                    isOwnerEntry: r.isOwnerEntry,
-                    assignedTables: r.assignedTables?.map((t: any) => ({
-                        id: t.documentId,
-                        name: t.name,
-                        capacity: t.capacity,
-                    })) || [],
-                    customer: r.customer ? {
-                        id: r.customer.documentId,
-                        name: r.customer.name,
-                        totalVisits: r.customer.totalVisits,
-                    } : null,
-                    createdAt: r.createdAt,
-                    updatedAt: r.updatedAt,
-                })),
+                data: dataWithStats,
                 meta: {
                     page: parseInt(page as string),
                     pageSize: parseInt(pageSize as string),

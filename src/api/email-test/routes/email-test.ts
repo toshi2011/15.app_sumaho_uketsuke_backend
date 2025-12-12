@@ -10,6 +10,7 @@ export default {
             path: '/test/email/preview/:template',
             handler: 'email-test.preview',
             config: {
+                auth: false, // 認証なしでアクセス可能
                 policies: [],
                 middlewares: [],
                 description: 'メールテンプレートプレビュー（HTML）',
@@ -20,6 +21,7 @@ export default {
             path: '/test/email/send',
             handler: 'email-test.send',
             config: {
+                auth: false, // 認証なしでアクセス可能
                 policies: [],
                 middlewares: [],
                 description: 'テストメール送信',

@@ -103,3 +103,97 @@ http://localhost:1338
 ```
 
  で起動中です。
+
+
+
+## BE-103: 予約リードタイム制限
+
+### 変更点
+
+- Store スキーマに 
+    
+    ```
+    minBookingLeadTime
+    ```
+    
+     追加（デフォルト: 180分）
+
+### 新規API
+
+|エンドポイント|メソッド|説明|
+|---|---|---|
+|```<br>/api/public/reservations<br>```|POST|公開予約作成（リードタイム検証あり）|
+|```<br>/api/public/reservations/:reservationNumber<br>```|GET|予約番号で検索|
+
+### 動作
+
+- 予約時刻が 
+    
+    ```
+    now + minBookingLeadTime
+    ```
+    
+     より前 → **400エラー**
+    
+    > "当日の直前予約はお電話にて承ります。"
+    
+- ```
+    isOwnerEntry: true
+    ```
+    
+     → 制限なし
+
+---
+
+## BE-104: 顧客履歴集約API
+
+### レスポンス追加
+
+```
+GET /api/owner/reservations
+```
+
+ に 
+
+```
+customerStats
+```
+
+ 追加:
+
+json
+
+{
+
+  "customerStats": {
+
+    "visitCount": 5,
+
+    "lastVisit": "2024-11-01",
+
+    "cancelCount": 0,
+
+    "noShowCount": 1,
+
+    "notesHistory": ["辛いもの苦手", "窓際希望"],
+
+    "isFirstTime": false
+
+  }
+
+}
+
+### 作成ファイル
+
+- ```
+    customer/services/customer-stats.ts
+    ```
+    
+     - 電話番号ベース履歴集約
+- ```
+    public-reservation/
+    ```
+    
+     - 公開予約API
+
+Strapiを再起動して動作を確認してください。
