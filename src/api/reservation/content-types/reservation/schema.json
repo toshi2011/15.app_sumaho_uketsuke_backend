@@ -103,6 +103,10 @@
             "relation": "manyToOne",
             "target": "api::store.store",
             "inversedBy": "reservations"
+        },
+        "isRead": {
+            "type": "boolean",
+            "default": false
         }
     }
 }

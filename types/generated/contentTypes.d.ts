@@ -623,6 +623,7 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
         number
       >;
     isOwnerEntry: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    isRead: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     language: Schema.Attribute.Enumeration<['ja', 'en', 'zh', 'ko']> &
       Schema.Attribute.DefaultTo<'ja'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
