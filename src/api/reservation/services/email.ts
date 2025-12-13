@@ -21,6 +21,10 @@ const createTransporter = () => {
             user: process.env.SMTP_USER || process.env.AWS_SES_SMTP_USER,
             pass: process.env.SMTP_PASS || process.env.AWS_SES_SMTP_PASS,
         },
+        tls: {
+            // 自己署名証明書エラーを回避（開発環境用）
+            rejectUnauthorized: false,
+        },
     };
 
     // 開発環境でSMTP設定がない場合はログ出力のみ

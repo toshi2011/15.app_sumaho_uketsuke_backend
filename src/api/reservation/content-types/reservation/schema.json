@@ -107,6 +107,15 @@
         "isRead": {
             "type": "boolean",
             "default": false
+        },
+        "confirmedAt": {
+            "type": "datetime"
+        },
+        "cancelledAt": {
+            "type": "datetime"
+        },
+        "cancelReason": {
+            "type": "text"
         }
     }
 }

@@ -598,6 +598,9 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
   };
   attributes: {
     assignedTables: Schema.Attribute.Relation<'manyToMany', 'api::table.table'>;
+    cancelledAt: Schema.Attribute.DateTime;
+    cancelReason: Schema.Attribute.Text;
+    confirmedAt: Schema.Attribute.DateTime;
     course: Schema.Attribute.String;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &

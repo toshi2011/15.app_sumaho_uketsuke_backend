@@ -10,15 +10,25 @@ export default {
         // 予約作成時に仮受付メールを送信
         if (result.email && result.status === 'pending') {
             try {
-                // 店舗情報を取得
-                const store = await strapi.db.query('api::store.store').findOne({
-                    where: { id: result.store?.id },
-                });
+                // 予約データを店舗情報付きで再取得
+                const reservationWithStore = await strapi.entityService.findOne(
+                    'api::reservation.reservation',
+                    result.id,
+                    { populate: ['store'] }
+                ) as any;
+
+                const store = reservationWithStore?.store;
 
                 if (store) {
                     // メールサービスを呼び出し
-                    await strapi.service('api::reservation.email').sendReservationEmail(result, store, 'pending');
-                    strapi.log.info(`Pending email sent for reservation ${result.reservationNumber}`);
+                    await strapi.service('api::reservation.email').sendReservationEmail(
+                        reservationWithStore,
+                        store,
+                        'pending'
+                    );
+                    strapi.log.info(`Pending email sent for reservation ${result.id}`);
+                } else {
+                    strapi.log.warn(`Store not found for reservation ${result.id}`);
                 }
             } catch (error) {
                 strapi.log.error('Failed to send pending email:', error);
@@ -36,11 +46,25 @@ export default {
             return;
         }
 
+        // confirmedAt または cancelledAt が設定されている場合のみメール送信
+        // （店主が直接登録した場合はこれらのフィールドがない）
+        const data = params?.data;
+        const isStatusChangeFromPending = data?.confirmedAt || data?.cancelledAt;
+
+        if (!isStatusChangeFromPending) {
+            strapi.log.info('No confirmedAt/cancelledAt, skipping email (likely owner-created reservation)');
+            return;
+        }
+
         try {
-            // 店舗情報を取得
-            const store = await strapi.db.query('api::store.store').findOne({
-                where: { id: result.store?.id },
-            });
+            // 予約データを店舗情報付きで再取得
+            const reservationWithStore = await strapi.entityService.findOne(
+                'api::reservation.reservation',
+                result.id,
+                { populate: ['store'] }
+            ) as any;
+
+            const store = reservationWithStore?.store;
 
             if (!store) {
                 strapi.log.warn('Store not found for reservation:', result.id);
@@ -49,14 +73,19 @@ export default {
 
             // ステータスに応じてメール送信
             if (newStatus === 'confirmed') {
-                await strapi.service('api::reservation.email').sendReservationEmail(result, store, 'confirmed');
-                strapi.log.info(`Confirmation email sent for reservation ${result.reservationNumber}`);
-            } else if (newStatus === 'rejected') {
-                await strapi.service('api::reservation.email').sendReservationEmail(result, store, 'rejected');
-                strapi.log.info(`Rejection email sent for reservation ${result.reservationNumber}`);
-            } else if (newStatus === 'cancelled') {
-                await strapi.service('api::reservation.email').sendReservationEmail(result, store, 'cancelled');
-                strapi.log.info(`Cancellation email sent for reservation ${result.reservationNumber}`);
+                await strapi.service('api::reservation.email').sendReservationEmail(
+                    reservationWithStore,
+                    store,
+                    'confirmed'
+                );
+                strapi.log.info(`Confirmation email sent for reservation ${result.id}`);
+            } else if (newStatus === 'rejected' || newStatus === 'cancelled') {
+                await strapi.service('api::reservation.email').sendReservationEmail(
+                    reservationWithStore,
+                    store,
+                    'cancelled'
+                );
+                strapi.log.info(`Cancellation email sent for reservation ${result.id}`);
             }
         } catch (error) {
             strapi.log.error('Failed to send status change email:', error);
