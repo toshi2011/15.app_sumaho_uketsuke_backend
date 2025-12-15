@@ -5,39 +5,125 @@
         "singularName": "reservation",
         "pluralName": "reservations",
         "displayName": "Reservation",
-        "description": "予約情報"
+        "description": "予約情報（詳細モード対応）"
     },
     "options": {
-        "draftAndPublish": true
+        "draftAndPublish": false
     },
     "pluginOptions": {},
     "attributes": {
+        "guestName": {
+            "type": "string",
+            "required": true
+        },
+        "email": {
+            "type": "email"
+        },
+        "phone": {
+            "type": "string"
+        },
+        "date": {
+            "type": "date",
+            "required": true
+        },
         "time": {
             "type": "string",
             "required": true
         },
-        "name": {
-            "type": "string",
-            "required": true
+        "duration": {
+            "type": "integer",
+            "default": 120,
+            "min": 15
         },
         "guests": {
             "type": "integer",
             "required": true,
             "min": 1
         },
+        "status": {
+            "type": "enumeration",
+            "enum": [
+                "pending",
+                "confirmed",
+                "rejected",
+                "cancelled",
+                "no_show"
+            ],
+            "default": "pending",
+            "required": true
+        },
+        "assignedTables": {
+            "type": "relation",
+            "relation": "manyToMany",
+            "target": "api::table.table",
+            "inversedBy": "reservations"
+        },
+        "reservationNumber": {
+            "type": "string",
+            "unique": true
+        },
+        "isOwnerEntry": {
+            "type": "boolean",
+            "default": false
+        },
+        "source": {
+            "type": "enumeration",
+            "enum": [
+                "web",
+                "owner",
+                "phone"
+            ],
+            "default": "web"
+        },
+        "ownerNote": {
+            "type": "text"
+        },
+        "customer": {
+            "type": "relation",
+            "relation": "manyToOne",
+            "target": "api::customer.customer",
+            "inversedBy": "reservations"
+        },
+        "notes": {
+            "type": "text"
+        },
         "course": {
             "type": "string"
         },
-        "phone": {
-            "type": "string"
+        "language": {
+            "type": "enumeration",
+            "enum": [
+                "ja",
+                "en",
+                "zh",
+                "ko"
+            ],
+            "default": "ja"
         },
-        "email": {
-            "type": "email"
+        "ownerReply": {
+            "type": "text"
         },
-        "date": {
-            "type": "date"
+        "requiresAttention": {
+            "type": "boolean",
+            "default": false
         },
-        "notes": {
+        "store": {
+            "type": "relation",
+            "relation": "manyToOne",
+            "target": "api::store.store",
+            "inversedBy": "reservations"
+        },
+        "isRead": {
+            "type": "boolean",
+            "default": false
+        },
+        "confirmedAt": {
+            "type": "datetime"
+        },
+        "cancelledAt": {
+            "type": "datetime"
+        },
+        "cancelReason": {
             "type": "text"
         }
     }

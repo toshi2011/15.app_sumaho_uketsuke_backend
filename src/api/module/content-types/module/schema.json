@@ -1,0 +1,36 @@
+{
+    "kind": "collectionType",
+    "collectionName": "modules",
+    "info": {
+        "singularName": "module",
+        "pluralName": "modules",
+        "displayName": "Module",
+        "description": "Feature modules for the platform"
+    },
+    "options": {
+        "draftAndPublish": false
+    },
+    "pluginOptions": {},
+    "attributes": {
+        "slug": {
+            "type": "uid",
+            "required": true
+        },
+        "name": {
+            "type": "string",
+            "required": true
+        },
+        "description": {
+            "type": "text"
+        },
+        "monthlyPrice": {
+            "type": "integer"
+        },
+        "store_modules": {
+            "type": "relation",
+            "relation": "oneToMany",
+            "target": "api::store-module.store-module",
+            "mappedBy": "module"
+        }
+    }
+}

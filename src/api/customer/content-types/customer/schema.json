@@ -1,0 +1,49 @@
+{
+    "kind": "collectionType",
+    "collectionName": "customers",
+    "info": {
+        "singularName": "customer",
+        "pluralName": "customers",
+        "displayName": "Customer",
+        "description": "顧客マスタ（CRM用）"
+    },
+    "options": {
+        "draftAndPublish": false
+    },
+    "pluginOptions": {},
+    "attributes": {
+        "name": {
+            "type": "string",
+            "required": true
+        },
+        "email": {
+            "type": "email"
+        },
+        "phone": {
+            "type": "string"
+        },
+        "notes": {
+            "type": "text"
+        },
+        "totalVisits": {
+            "type": "integer",
+            "default": 0,
+            "min": 0
+        },
+        "lastVisitDate": {
+            "type": "date"
+        },
+        "reservations": {
+            "type": "relation",
+            "relation": "oneToMany",
+            "target": "api::reservation.reservation",
+            "mappedBy": "customer"
+        },
+        "store": {
+            "type": "relation",
+            "relation": "manyToOne",
+            "target": "api::store.store",
+            "inversedBy": "customers"
+        }
+    }
+}
