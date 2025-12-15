@@ -643,6 +643,8 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
     requiresAttention: Schema.Attribute.Boolean &
       Schema.Attribute.DefaultTo<false>;
     reservationNumber: Schema.Attribute.String & Schema.Attribute.Unique;
+    source: Schema.Attribute.Enumeration<['web', 'owner', 'phone']> &
+      Schema.Attribute.DefaultTo<'web'>;
     status: Schema.Attribute.Enumeration<
       ['pending', 'confirmed', 'rejected', 'cancelled', 'no_show']
     > &
@@ -723,12 +725,29 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
       Schema.Attribute.DefaultTo<90>;
     description: Schema.Attribute.Text;
     digitalPresence: Schema.Attribute.JSON;
+    dinnerDuration: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 30;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<90>;
     lineChannelAccessToken: Schema.Attribute.Text & Schema.Attribute.Private;
     lineUserId: Schema.Attribute.String & Schema.Attribute.Private;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::store.store'> &
       Schema.Attribute.Private;
     logoImage: Schema.Attribute.Media<'images'>;
+    lunchDuration: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 30;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<60>;
+    lunchEndTime: Schema.Attribute.String & Schema.Attribute.DefaultTo<'14:00'>;
     maxCapacity: Schema.Attribute.Integer &
       Schema.Attribute.SetMinMax<
         {
@@ -821,6 +840,13 @@ export interface ApiTableTable extends Struct.CollectionTypeSchema {
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::table.table'> &
       Schema.Attribute.Private;
+    maxCapacity: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 1;
+        },
+        number
+      >;
     name: Schema.Attribute.String & Schema.Attribute.Required;
     publishedAt: Schema.Attribute.DateTime;
     reservations: Schema.Attribute.Relation<

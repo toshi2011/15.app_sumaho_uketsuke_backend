@@ -7,32 +7,52 @@ export default {
     async afterCreate(event) {
         const { result } = event;
 
-        // 予約作成時に仮受付メールを送信
-        if (result.email && result.status === 'pending') {
-            try {
-                // 予約データを店舗情報付きで再取得
-                const reservationWithStore = await strapi.entityService.findOne(
-                    'api::reservation.reservation',
-                    result.id,
-                    { populate: ['store'] }
-                ) as any;
+        // メールアドレスがなければスキップ
+        if (!result.email) {
+            return;
+        }
 
-                const store = reservationWithStore?.store;
+        // 店主登録（source: 'owner'）の場合はメールを送信しない
+        if (result.source === 'owner') {
+            strapi.log.info(`Skipping email for owner-created reservation ${result.id}`);
+            return;
+        }
 
-                if (store) {
-                    // メールサービスを呼び出し
-                    await strapi.service('api::reservation.email').sendReservationEmail(
-                        reservationWithStore,
-                        store,
-                        'pending'
-                    );
-                    strapi.log.info(`Pending email sent for reservation ${result.id}`);
-                } else {
-                    strapi.log.warn(`Store not found for reservation ${result.id}`);
-                }
-            } catch (error) {
-                strapi.log.error('Failed to send pending email:', error);
+        try {
+            // 予約データを店舗情報付きで再取得
+            const reservationWithStore = await strapi.entityService.findOne(
+                'api::reservation.reservation',
+                result.id,
+                { populate: ['store'] }
+            ) as any;
+
+            const store = reservationWithStore?.store;
+
+            if (!store) {
+                strapi.log.warn(`Store not found for reservation ${result.id}`);
+                return;
             }
+
+            // ステータスに応じてメール送信
+            if (result.status === 'pending') {
+                // 仮受付メール
+                await strapi.service('api::reservation.email').sendReservationEmail(
+                    reservationWithStore,
+                    store,
+                    'pending'
+                );
+                strapi.log.info(`Pending email sent for reservation ${result.id}`);
+            } else if (result.status === 'confirmed') {
+                // 自動確定の場合は確定メール
+                await strapi.service('api::reservation.email').sendReservationEmail(
+                    reservationWithStore,
+                    store,
+                    'confirmed'
+                );
+                strapi.log.info(`Confirmation email sent for auto-approved reservation ${result.id}`);
+            }
+        } catch (error) {
+            strapi.log.error('Failed to send email:', error);
         }
     },
 
@@ -49,6 +69,7 @@ export default {
         // confirmedAt または cancelledAt が設定されている場合のみメール送信
         // （店主が直接登録した場合はこれらのフィールドがない）
         const data = params?.data;
+        strapi.log.info('afterUpdate params.data:', JSON.stringify(data));
         const isStatusChangeFromPending = data?.confirmedAt || data?.cancelledAt;
 
         if (!isStatusChangeFromPending) {

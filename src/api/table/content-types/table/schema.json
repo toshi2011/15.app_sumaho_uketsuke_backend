@@ -21,6 +21,10 @@
             "required": true,
             "min": 1
         },
+        "maxCapacity": {
+            "type": "integer",
+            "min": 1
+        },
         "description": {
             "type": "text"
         },

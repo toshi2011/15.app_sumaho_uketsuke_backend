@@ -92,6 +92,20 @@
             "default": 90,
             "min": 30
         },
+        "lunchDuration": {
+            "type": "integer",
+            "default": 60,
+            "min": 30
+        },
+        "dinnerDuration": {
+            "type": "integer",
+            "default": 90,
+            "min": 30
+        },
+        "lunchEndTime": {
+            "type": "string",
+            "default": "14:00"
+        },
         "minBookingLeadTime": {
             "type": "integer",
             "default": 180,
