@@ -3,37 +3,16 @@
  * INF-300/301 実装
  */
 
-import * as nodemailer from 'nodemailer';
 import * as handlebars from 'handlebars';
 import * as fs from 'fs';
 import * as path from 'path';
+import { AdapterFactory } from '../../../adapters/factory';
 
 // テンプレートのキャッシュ
 const templateCache: Map<string, handlebars.TemplateDelegate> = new Map();
 
-// AWS SES用のトランスポート設定
-const createTransporter = () => {
-    const config: any = {
-        host: process.env.SMTP_HOST || 'email-smtp.ap-northeast-1.amazonaws.com',
-        port: parseInt(process.env.SMTP_PORT || '587'),
-        secure: false,
-        auth: {
-            user: process.env.SMTP_USER || process.env.AWS_SES_SMTP_USER,
-            pass: process.env.SMTP_PASS || process.env.AWS_SES_SMTP_PASS,
-        },
-        tls: {
-            // 自己署名証明書エラーを回避（開発環境用）
-            rejectUnauthorized: false,
-        },
-    };
-
-    // 開発環境でSMTP設定がない場合はログ出力のみ
-    if (!config.auth.user || !config.auth.pass) {
-        return null;
-    }
-
-    return nodemailer.createTransport(config);
-};
+// Template caching and AWS configuration handled by Adapter now (AWS config moved).
+// Only template loading pertains to this service.
 
 // テンプレートを読み込み
 const loadTemplate = (templateName: string, language: string = 'ja'): handlebars.TemplateDelegate | null => {
@@ -137,28 +116,21 @@ export default () => ({
 
         const html = template(variables);
 
-        const transporter = createTransporter();
-        if (!transporter) {
-            console.log('SMTP not configured, email content:');
-            console.log(`To: ${reservation.email}`);
-            console.log(`Subject: ${config.subject}`);
-            console.log('HTML generated successfully');
-            return { success: true, mock: true };
-        }
+        // Adapterを使用してメール送信
+        const emailAdapter = AdapterFactory.getEmailAdapter();
 
-        try {
-            const fromEmail = process.env.EMAIL_FROM || `noreply@${process.env.EMAIL_DOMAIN || 'example.com'}`;
-            const info = await transporter.sendMail({
-                from: `"${store.name}" <${fromEmail}>`,
-                to: reservation.email,
-                subject: config.subject,
-                html,
-            });
+        // Note: The adapter interface currently only supports (to, subject, body).
+        // Custom "from" names like `"${store.name}" <${fromEmail}>` are not yet supported by the simple interface
+        // unless we update it. For now, we rely on the adapter's default or simplest sending mechanism.
+        // To maintain the "From" behavior seamlessly, we might need to update the interface or accept 
+        // that the adapter handles 'from' configuration centrally. 
+        // *However*, we can pass the store name in the body or subject (already done).
+        // If we strictly need dynamic sender names, we should refactor the interface later.
 
-            return { success: true, messageId: info.messageId };
-        } catch (error: any) {
-            console.error('Email sending error:', error);
-            return { success: false, error: error.message };
-        }
+        return await emailAdapter.sendMail(
+            reservation.email,
+            config.subject,
+            html
+        );
     },
 });

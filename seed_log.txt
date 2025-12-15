@@ -1,0 +1,53 @@
+[2025-12-15 14:28:14.684] [33mwarn[39m: admin.auth.options.expiresIn is deprecated and will be removed in Strapi 6. Please configure admin.auth.sessions.maxRefreshTokenLifespan and admin.auth.sessions.maxSessionLifespan.
+Granting public permissions: [
+  'api::reservation.reservation.update',
+  'api::owner-session.owner-session.create',
+  'api::owner-session.owner-session.find',
+  'api::owner-session.owner-session.update',
+  'api::owner-notification.owner-notification.check',
+  'api::owner-reservation.owner-reservation.list',
+  'api::owner-reservation.owner-reservation.updateStatus',
+  'api::public-reservation.public-reservation.create',
+  'api::public-reservation.public-reservation.findByNumber',
+  'api::table.table.find',
+  'api::table.table.findOne',
+  'api::table.table.create',
+  'api::table.table.update',
+  'api::table.table.delete'
+]
+Permissions granted successfully.
+
+ Project information
+
+[90m笏娯楳笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏[39m[90m笏ｬ笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏・[39m
+[90m笏・[39m Time               [90m笏・[39m Mon Dec 15 2025 14:28:14 GMT+0900 (譌･譛ｬ讓呎ｺ匁凾)   [90m笏・[39m
+[90m笏・[39m Launched in        [90m笏・[39m 2469 ms                                          [90m笏・[39m
+[90m笏・[39m Environment        [90m笏・[39m development                                      [90m笏・[39m
+[90m笏・[39m Process PID        [90m笏・[39m 5232                                             [90m笏・[39m
+[90m笏・[39m Version            [90m笏・[39m 5.31.2 (node v20.19.4)                           [90m笏・[39m
+[90m笏・[39m Edition            [90m笏・[39m Enterprise                                       [90m笏・[39m
+[90m笏・[39m Database           [90m笏・[39m sqlite                                           [90m笏・[39m
+[90m笏・[39m Database name      [90m笏・[39m C:\strapi-data\uketsuke-backend\data.db          [90m笏・[39m
+[90m笏披楳笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏[39m[90m笏ｴ笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏・[39m
+
+ Actions available
+
+Welcome back!
+To manage your project 噫, go to the administration panel at:
+http://localhost:1338/admin
+
+To access the server 笞｡・・ go to:
+http://localhost:1338
+
+[2025-12-15 14:28:14.989] [32minfo[39m: Strapi started successfully
+Module already exists: reservation_basic
+Module already enabled for store: Default Store
+Module already enabled for store: 繝・せ繝亥ｺ苓・D
+Module already enabled for store: 繝・せ繝亥ｺ苓・E
+Module already enabled for store: 繝・せ繝・x7k9
+Module already enabled for store: 繝・せ繝・q4m2
+Module already enabled for store: 繝・せ繝・z8r1
+Module already enabled for store: 繝・せ繝・w5n7
+Module already enabled for store: 繝・せ繝・t3c6
+Seed script completed successfully.
+[2025-12-15 14:28:15.002] [32minfo[39m: Shutting down Strapi

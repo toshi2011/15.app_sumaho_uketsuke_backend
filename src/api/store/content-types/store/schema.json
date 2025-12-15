@@ -184,6 +184,12 @@
         "lineUserId": {
             "type": "string",
             "private": true
+        },
+        "store_modules": {
+            "type": "relation",
+            "relation": "oneToMany",
+            "target": "api::store-module.store-module",
+            "mappedBy": "store"
         }
     }
 }

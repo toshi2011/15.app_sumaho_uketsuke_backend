@@ -1,0 +1,35 @@
+{
+    "kind": "collectionType",
+    "collectionName": "store_modules",
+    "info": {
+        "singularName": "store-module",
+        "pluralName": "store-modules",
+        "displayName": "Store Module",
+        "description": "Association between Store and Module with settings"
+    },
+    "options": {
+        "draftAndPublish": false
+    },
+    "pluginOptions": {},
+    "attributes": {
+        "store": {
+            "type": "relation",
+            "relation": "manyToOne",
+            "target": "api::store.store",
+            "inversedBy": "store_modules"
+        },
+        "module": {
+            "type": "relation",
+            "relation": "manyToOne",
+            "target": "api::module.module",
+            "inversedBy": "store_modules"
+        },
+        "isEnabled": {
+            "type": "boolean",
+            "default": true
+        },
+        "settings": {
+            "type": "json"
+        }
+    }
+}
