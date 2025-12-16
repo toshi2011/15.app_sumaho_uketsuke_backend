@@ -613,6 +613,7 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
         },
         number
       >;
+    isRead: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -623,6 +624,10 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
     notes: Schema.Attribute.Text;
     phone: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
+    status: Schema.Attribute.Enumeration<
+      ['pending', 'confirmed', 'canceled', 'completed']
+    > &
+      Schema.Attribute.DefaultTo<'pending'>;
     store: Schema.Attribute.Relation<'manyToOne', 'api::store.store'>;
     time: Schema.Attribute.String & Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
@@ -698,10 +703,27 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
       Schema.Attribute.DefaultTo<90>;
     description: Schema.Attribute.Text;
     digitalPresence: Schema.Attribute.JSON;
+    dinnerDuration: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 30;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<120>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::store.store'> &
       Schema.Attribute.Private;
     logoImage: Schema.Attribute.Media<'images'>;
+    lunchDuration: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 30;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<90>;
+    lunchEndTime: Schema.Attribute.Time & Schema.Attribute.DefaultTo<'15:00'>;
     maxCapacity: Schema.Attribute.Integer &
       Schema.Attribute.SetMinMax<
         {

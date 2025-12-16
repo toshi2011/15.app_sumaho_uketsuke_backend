@@ -1,0 +1,8 @@
+src/api/customer/controllers/customer.ts(7,47): error TS2345: Argument of type '"api::customer.customer"' is not assignable to parameter of type 'ContentType'.
+src/api/customer/routes/customer.ts(7,43): error TS2345: Argument of type '"api::customer.customer"' is not assignable to parameter of type 'ContentType'.
+src/api/customer/services/customer.ts(7,44): error TS2345: Argument of type '"api::customer.customer"' is not assignable to parameter of type 'ContentType'.
+src/api/owner-session/controllers/owner-session.ts(7,47): error TS2345: Argument of type '"api::owner-session.owner-session"' is not assignable to parameter of type 'ContentType'.
+src/api/owner-session/routes/owner-session.ts(7,43): error TS2345: Argument of type '"api::owner-session.owner-session"' is not assignable to parameter of type 'ContentType'.
+src/api/owner-session/services/owner-session.ts(7,44): error TS2345: Argument of type '"api::owner-session.owner-session"' is not assignable to parameter of type 'ContentType'.
+src/api/reservation/content-types/reservation/lifecycles.ts(26,30): error TS2322: Type '"store"' is not assignable to type '`${string}.${string}` | `${string},${string}` | PopulatableAttributeNames<"api::reservation.reservation">'.
+src/api/reservation/content-types/reservation/lifecycles.ts(85,30): error TS2322: Type '"store"' is not assignable to type '`${string}.${string}` | `${string},${string}` | PopulatableAttributeNames<"api::reservation.reservation">'.

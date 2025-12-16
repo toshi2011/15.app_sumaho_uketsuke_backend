@@ -134,8 +134,14 @@ build
 # Obsidian
 ############################
 
+# Ignore entire note directory
+note/*
+# But keep note/issues tracked
+!note/issues/
+!note/issues/**
+
 note/.obsidian/
 note/issue_watcher.py
-
 backend/note/issues/起票済/
 pg_marge3.bat
+

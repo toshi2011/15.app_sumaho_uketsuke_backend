@@ -1,0 +1,3 @@
+12月25日と11月29日にそれぞれ1と表示されてます。しかしそこをクリックして詳細にとんでも時間と名前、あと人数しか表示されません。備考の内容が出ません。
+ Server  [getReservations] Raw API response: {data: Array(2), meta: {…}}data: Array(2)0: {id: 3, documentId: 'kgl2hdj7637nw46rrgcwgqtv', time: '20', name: 'Toshi', guests: 2, …}1: {id: 5, documentId: 'duqryttco8urnfcu0zd6ny9x', time: '18:00', name: '山田次郎', guests: 2, …}length: 2[[Prototype]]: Array(0)meta: {pagination: {…}}[[Prototype]]: Object
+api.ts:77  Server  [getReservations] Parsed reservations from Strapi: 

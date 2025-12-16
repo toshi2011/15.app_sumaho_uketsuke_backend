@@ -40,6 +40,20 @@
         "notes": {
             "type": "text"
         },
+        "status": {
+            "type": "enumeration",
+            "enum": [
+                "pending",
+                "confirmed",
+                "canceled",
+                "completed"
+            ],
+            "default": "pending"
+        },
+        "isRead": {
+            "type": "boolean",
+            "default": false
+        },
         "store": {
             "type": "relation",
             "relation": "manyToOne",

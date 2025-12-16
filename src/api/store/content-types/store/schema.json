@@ -92,6 +92,20 @@
             "default": 90,
             "min": 30
         },
+        "lunchDuration": {
+            "type": "integer",
+            "default": 90,
+            "min": 30
+        },
+        "dinnerDuration": {
+            "type": "integer",
+            "default": 120,
+            "min": 30
+        },
+        "lunchEndTime": {
+            "type": "time",
+            "default": "15:00"
+        },
         "menuItems": {
             "type": "relation",
             "relation": "oneToMany",
