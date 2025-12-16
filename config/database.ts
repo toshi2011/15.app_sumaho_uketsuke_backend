@@ -1,7 +1,7 @@
----------- \15.app_sumaho_uketsuke\backend\config\database.ts---------- 
+
 import path from 'path';
 
-export default ({ env }) => {
+module.exports = ({ env }) => {
   const client = env('DATABASE_CLIENT', 'sqlite');
 
   const connections = {
