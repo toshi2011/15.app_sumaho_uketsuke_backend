@@ -106,6 +106,41 @@
             "type": "time",
             "default": "15:00"
         },
+        "cleanUpDuration": {
+            "type": "integer",
+            "default": 15,
+            "min": 0
+        },
+        "bookingClosingRule": {
+            "type": "enumeration",
+            "enum": [
+                "strict_closing",
+                "last_order_limit"
+            ],
+            "default": "last_order_limit"
+        },
+        "dynamicDurationRate": {
+            "type": "integer",
+            "default": 10,
+            "min": 0
+        },
+        "rejectionStrategy": {
+            "type": "enumeration",
+            "enum": [
+                "call_request",
+                "auto_reject"
+            ],
+            "default": "call_request"
+        },
+        "bookingAcceptanceMode": {
+            "type": "enumeration",
+            "enum": [
+                "auto",
+                "manual_if_notes",
+                "manual"
+            ],
+            "default": "auto"
+        },
         "menuItems": {
             "type": "relation",
             "relation": "oneToMany",

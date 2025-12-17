@@ -60,6 +60,31 @@
             "target": "api::store.store",
             "inversedBy": "reservations"
         },
+        "source": {
+            "type": "enumeration",
+            "enum": [
+                "web",
+                "owner",
+                "phone",
+                "walk_in",
+                "google",
+                "other"
+            ],
+            "default": "web"
+        },
+        "ownerNote": {
+            "type": "text"
+        },
+        "requiresReview": {
+            "type": "boolean",
+            "default": false
+        },
+        "reviewReason": {
+            "type": "string"
+        },
+        "confirmedAt": {
+            "type": "datetime"
+        },
         "customer": {
             "type": "relation",
             "relation": "manyToOne",

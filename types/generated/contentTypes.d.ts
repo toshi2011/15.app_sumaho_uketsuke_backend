@@ -598,6 +598,7 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
   };
   attributes: {
     assignedTables: Schema.Attribute.Relation<'manyToMany', 'api::table.table'>;
+    confirmedAt: Schema.Attribute.DateTime;
     course: Schema.Attribute.String;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -622,8 +623,16 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     name: Schema.Attribute.String & Schema.Attribute.Required;
     notes: Schema.Attribute.Text;
+    ownerNote: Schema.Attribute.Text;
     phone: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
+    requiresReview: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    reviewReason: Schema.Attribute.String;
+    source: Schema.Attribute.Enumeration<
+      ['web', 'owner', 'phone', 'walk_in', 'google', 'other']
+    > &
+      Schema.Attribute.DefaultTo<'web'>;
     status: Schema.Attribute.Enumeration<
       ['pending', 'confirmed', 'canceled', 'completed']
     > &
@@ -686,8 +695,24 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
   attributes: {
     address: Schema.Attribute.String;
     adminToken: Schema.Attribute.String & Schema.Attribute.Private;
+    bookingAcceptanceMode: Schema.Attribute.Enumeration<
+      ['auto', 'manual_if_notes', 'manual']
+    > &
+      Schema.Attribute.DefaultTo<'auto'>;
+    bookingClosingRule: Schema.Attribute.Enumeration<
+      ['strict_closing', 'last_order_limit']
+    > &
+      Schema.Attribute.DefaultTo<'last_order_limit'>;
     branding: Schema.Attribute.JSON;
     businessHours: Schema.Attribute.JSON;
+    cleanUpDuration: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<15>;
     coverImage: Schema.Attribute.Media<'images'>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -711,6 +736,14 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
         number
       > &
       Schema.Attribute.DefaultTo<120>;
+    dynamicDurationRate: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<10>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::store.store'> &
       Schema.Attribute.Private;
@@ -750,6 +783,10 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
     phoneNumber: Schema.Attribute.String;
     postalCode: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
+    rejectionStrategy: Schema.Attribute.Enumeration<
+      ['call_request', 'auto_reject']
+    > &
+      Schema.Attribute.DefaultTo<'call_request'>;
     reservations: Schema.Attribute.Relation<
       'oneToMany',
       'api::reservation.reservation'
