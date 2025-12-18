@@ -16,13 +16,14 @@
     "seed:stores": "ts-node scripts/bulk-import-stores.ts"
   },
   "dependencies": {
-    "@strapi/plugin-cloud": "5.31.2",
-    "@strapi/plugin-users-permissions": "5.31.2",
-    "@strapi/strapi": "5.31.2",
+    "@strapi/plugin-cloud": "5.33.0",
+    "@strapi/plugin-users-permissions": "5.33.0",
+    "@strapi/strapi": "5.33.0",
     "better-sqlite3": "12.4.1",
     "csv-parse": "^6.1.0",
     "csv-parser": "^3.2.0",
     "mime-types": "^3.0.2",
+    "nodemailer": "^7.0.11",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "react-router-dom": "^6.0.0",
@@ -33,6 +34,7 @@
   "devDependencies": {
     "@types/mime-types": "^3.0.1",
     "@types/node": "^20",
+    "@types/nodemailer": "^7.0.4",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "ts-node": "^10.9.2",

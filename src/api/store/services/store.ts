@@ -21,6 +21,8 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
                 return { available: false, capacityUsed: 0, requiredDuration: 0, reason: 'Store not found', action: 'reject' };
             }
 
+            console.log(`[DEBUG] checkAvailability: storeId=${storeId}, foundStoreId=${store.id}, foundStoreDocId=${store.documentId}`);
+
             const maxCapacity = store.maxCapacity ?? 20;
             const maxGroupsPerSlot = store.maxGroupsPerSlot ?? 5;
             const cleanUpDuration = store.cleanUpDuration ?? 15;
@@ -45,19 +47,35 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
             }
             const targetEnd = new Date(targetStart.getTime() + requiredDuration * 60 * 1000);
 
-            // 3. Rule C: Business Hours Constraints
-            // Note: Simplification - checking strictly if booking goes into 'deep late night' or past reasonable closing logic
-            // Requires parsing businessHours JSON. Since structure varies, we verify mainly strict_closing against "date" boundary or simple logic.
-            // For now, we trust the frontend/user to provide valid open slots, but we enforce 'strict_closing' if possible.
-            // (Advanced implementation skipped to avoid fragile JSON parsing without type definition, will fall back to open unless clearly invalid)
+            // 3. ルール C: 営業時間制約
+            // 注記: 簡略化 - 予約が「深夜帯」に完全に含まれるか、妥当な閉店ロジックを超過するかを厳密にチェック
+            // businessHours JSONの解析が必要。構造が変動するため、主に「日付」境界または簡易ロジックに対するstrict_closingを検証。
+            // 現時点ではフロントエンド／ユーザーが有効な空き枠を提供すると信頼するが、可能な場合は「strict_closing」を強制する。
+            // （型定義なしの脆弱なJSON解析を回避するため高度な実装は省略。明らかに無効でない限りオープンにフォールバック）
 
-            // 4. Rule A: Turnover (Buffer) Time & Overlap Check
+            // 4. ルールA: 引継ぎ（バッファ）時間と重複チェック
+            // FIX: 正しいIDタイプでフィルタリングすることを保証。store.idは通常整数。
+            // Strapi 5 EntityServiceは通常'id'（整数）を受け入れるか、リレーション経由でフィルタリングする。
+            // 使用されるフィルタをログに記録しよう。
+
+            const filterQuery = {
+                date: date,
+                store: store.id  // Try direct ID assignment for relation if object syntax fails, or verify object syntax. 
+                // In Strapi 4/5 entityService, relation filter usually expects ID or object with ID.
+            };
+
+            // Revert to original object syntax but log it to see if it works
             const allReservations = await strapi.entityService.findMany('api::reservation.reservation', {
                 filters: {
                     date: date,
-                    store: { id: store.id } // BE-105: Filter by specific store ID
+                    status: { $ne: 'canceled' },
+                    // @ts-ignore
+                    store: { documentId: store.documentId }
                 },
             });
+
+            console.log(`[DEBUG] checkAvailability: found ${allReservations.length} reservations for date=${date}, store.id=${store.id}`);
+
 
             // Helper to calculate usage with variable cleanup buffer
             const calculateUsage = (bufferMinutes: number) => {

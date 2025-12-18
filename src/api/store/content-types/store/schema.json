@@ -104,7 +104,7 @@
         },
         "lunchEndTime": {
             "type": "time",
-            "default": "15:00"
+            "default": "15:00:00.000"
         },
         "cleanUpDuration": {
             "type": "integer",

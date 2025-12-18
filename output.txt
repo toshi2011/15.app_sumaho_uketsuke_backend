@@ -1,0 +1,25 @@
+[2025-12-18 14:41:09.971] [33mwarn[39m: admin.auth.options.expiresIn is deprecated and will be removed in Strapi 6. Please configure admin.auth.sessions.maxRefreshTokenLifespan and admin.auth.sessions.maxSessionLifespan.
+Granting public permissions: [
+  'api::reservation.reservation.update',
+  'api::owner-session.owner-session.create',
+  'api::owner-session.owner-session.find',
+  'api::owner-session.owner-session.update',
+  'api::owner-notification.owner-notification.check',
+  'api::owner-reservation.owner-reservation.list',
+  'api::owner-reservation.owner-reservation.updateStatus',
+  'api::public-reservation.public-reservation.create',
+  'api::public-reservation.public-reservation.findByNumber',
+  'api::table.table.find',
+  'api::table.table.findOne',
+  'api::table.table.create',
+  'api::table.table.update',
+  'api::table.table.delete'
+]
+Permissions granted successfully.
+Searching for store: 繝・せ繝・w5n7
+Store found:
+Name: 繝・せ繝・w5n7
+Document ID: hobi3hds89mqlu48xs6vj1ji
+ID: 13
+URL: http://localhost:3000/store/hobi3hds89mqlu48xs6vj1ji
+[2025-12-18 14:41:10.271] [32minfo[39m: Shutting down Strapi
