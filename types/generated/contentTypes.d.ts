@@ -695,6 +695,8 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
   attributes: {
     address: Schema.Attribute.String;
     adminToken: Schema.Attribute.String & Schema.Attribute.Private;
+    allowSameDayBooking: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<true>;
     bookingAcceptanceMode: Schema.Attribute.Enumeration<
       ['auto', 'manual_if_notes', 'manual']
     > &
@@ -728,6 +730,14 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
       Schema.Attribute.DefaultTo<90>;
     description: Schema.Attribute.Text;
     digitalPresence: Schema.Attribute.JSON;
+    dinnerCleanUp: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
     dinnerDuration: Schema.Attribute.Integer &
       Schema.Attribute.SetMinMax<
         {
@@ -748,6 +758,14 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::store.store'> &
       Schema.Attribute.Private;
     logoImage: Schema.Attribute.Media<'images'>;
+    lunchCleanUp: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
     lunchDuration: Schema.Attribute.Integer &
       Schema.Attribute.SetMinMax<
         {
@@ -766,6 +784,14 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
         number
       > &
       Schema.Attribute.DefaultTo<20>;
+    maxDurationLimit: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 30;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<180>;
     maxGroupsPerSlot: Schema.Attribute.Integer &
       Schema.Attribute.SetMinMax<
         {
@@ -779,6 +805,14 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
       'api::menu-item.menu-item'
     >;
     menuSheetImages: Schema.Attribute.Media<'images', true>;
+    minBookingLeadTime: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<60>;
     name: Schema.Attribute.String & Schema.Attribute.Required;
     ownerInfo: Schema.Attribute.JSON;
     phoneNumber: Schema.Attribute.String;
@@ -796,6 +830,7 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
       'oneToMany',
       'api::sales-log.sales-log'
     >;
+    sameDayCutoffTime: Schema.Attribute.Time;
     snsLink1Label: Schema.Attribute.String;
     snsLink1Url: Schema.Attribute.String;
     snsLink2Label: Schema.Attribute.String;

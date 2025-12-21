@@ -111,6 +111,33 @@
             "default": 15,
             "min": 0
         },
+        "lunchCleanUp": {
+            "type": "integer",
+            "default": 0,
+            "min": 0
+        },
+        "dinnerCleanUp": {
+            "type": "integer",
+            "default": 0,
+            "min": 0
+        },
+        "minBookingLeadTime": {
+            "type": "integer",
+            "default": 60,
+            "min": 0
+        },
+        "maxDurationLimit": {
+            "type": "integer",
+            "default": 180,
+            "min": 30
+        },
+        "allowSameDayBooking": {
+            "type": "boolean",
+            "default": true
+        },
+        "sameDayCutoffTime": {
+            "type": "time"
+        },
         "bookingClosingRule": {
             "type": "enumeration",
             "enum": [
