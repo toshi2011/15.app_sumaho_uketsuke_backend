@@ -1,0 +1,9 @@
+{
+    "data": {
+        "name": "テーブル2",
+        "baseCapacity": 4,
+        "maxCapacity": 6,
+        "store": "tj8k7xirmqvz5mvxjayj978c",
+        "isActive": true
+    }
+}

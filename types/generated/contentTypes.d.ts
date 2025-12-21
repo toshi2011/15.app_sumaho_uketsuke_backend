@@ -865,7 +865,7 @@ export interface ApiTableTable extends Struct.CollectionTypeSchema {
     draftAndPublish: false;
   };
   attributes: {
-    capacity: Schema.Attribute.Integer &
+    baseCapacity: Schema.Attribute.Integer &
       Schema.Attribute.Required &
       Schema.Attribute.SetMinMax<
         {
