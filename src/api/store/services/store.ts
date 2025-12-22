@@ -36,9 +36,11 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
             const dinnerStartStr = bh.dinner?.start || "17:00";
             const dinnerEndStr = bh.dinner?.end || "23:00";
 
-            // Cleanup Buffers
-            const lunchCleanUp = store.lunchCleanUp ?? store.cleanUpDuration ?? 0;
-            const dinnerCleanUp = store.dinnerCleanUp ?? store.cleanUpDuration ?? 0;
+            // 【仕様変更】
+            // UI設定項目削除に伴い、バッファ時間は強制的に0として扱います。
+            // 店主は平均滞在時間に片付け時間を含めて設定することが推奨されます。
+            const lunchCleanUp = 0;
+            const dinnerCleanUp = 0;
 
             // Durations
             const lunchDuration = store.lunchDuration ?? 90;
@@ -83,6 +85,9 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
             const targetEndMin = targetStartMin + requiredDuration;
             const targetEndWithBuffer = targetEndMin + currentCleanUp;
 
+            // 【仕様変更】
+            // 閉店ルールは「厳格（時間内退店）」のみサポートします。
+            // 予約終了時間が営業終了時間を超える場合は予約不可とします。
             // Rule C: Closing Time Constraint
             let closingMin = isLunch ? lunchEndMin : dinnerEndMin;
             if (targetEndWithBuffer > closingMin) {
@@ -92,7 +97,7 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
                     capacityUsed: 0,
                     requiredDuration,
                     reason: `Exceeds closing time. Max duration available: ${maxPossible} min`,
-                    action: 'reject'
+                    action: 'reject' // 【仕様変更】常にrejectを返す（call_request等の曖昧なステータスを返さない）
                 };
             }
 
