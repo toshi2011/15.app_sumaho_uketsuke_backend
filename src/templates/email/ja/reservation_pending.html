@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,23 +15,27 @@
             padding: 20px;
             background-color: #f5f5f5;
         }
+
         .container {
             background-color: #ffffff;
             border-radius: 8px;
             padding: 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
+
         .header {
             text-align: center;
             border-bottom: 2px solid #4CAF50;
             padding-bottom: 20px;
             margin-bottom: 25px;
         }
+
         .header h1 {
             color: #4CAF50;
             font-size: 24px;
             margin: 0;
         }
+
         .status-badge {
             display: inline-block;
             background-color: #FFA726;
@@ -40,25 +45,30 @@
             font-weight: bold;
             margin: 15px 0;
         }
+
         .reservation-details {
             background-color: #f9f9f9;
             border-left: 4px solid #4CAF50;
             padding: 20px;
             margin: 20px 0;
         }
+
         .reservation-details table {
             width: 100%;
             border-collapse: collapse;
         }
+
         .reservation-details td {
             padding: 10px 0;
             border-bottom: 1px dashed #ddd;
         }
+
         .reservation-details td:first-child {
             font-weight: bold;
             width: 100px;
             color: #666;
         }
+
         .reservation-number {
             font-size: 18px;
             font-weight: bold;
@@ -69,6 +79,7 @@
             border-radius: 4px;
             margin-bottom: 20px;
         }
+
         .message {
             background-color: #fff3e0;
             border: 1px solid #FFB74D;
@@ -76,6 +87,7 @@
             padding: 15px;
             margin: 20px 0;
         }
+
         .note {
             font-size: 14px;
             color: #666;
@@ -83,6 +95,7 @@
             padding-top: 20px;
             border-top: 1px solid #eee;
         }
+
         .footer {
             text-align: center;
             margin-top: 30px;
@@ -91,12 +104,14 @@
             color: #888;
             font-size: 12px;
         }
+
         .store-info {
             background-color: #f5f5f5;
             padding: 15px;
             border-radius: 4px;
             margin-top: 20px;
         }
+
         .store-info h3 {
             margin: 0 0 10px 0;
             font-size: 16px;
@@ -104,24 +119,25 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
             <h1>{{store.name}}</h1>
         </div>
-        
-        <p>{{reservation.guestName}} 様</p>
-        
+
+        <p>{{reservation.name}} 様</p>
+
         <p>この度はご予約いただき、誠にありがとうございます。</p>
-        
+
         <div class="status-badge">📋 仮受付</div>
-        
+
         <p>ご予約を受け付けました。店舗にて内容を確認後、<strong>確定メール</strong>をお送りいたします。</p>
-        
+
         <div class="reservation-number">
             予約番号: {{reservation.reservationNumber}}
         </div>
-        
+
         <div class="reservation-details">
             <table>
                 <tr>
@@ -144,14 +160,14 @@
                 {{/if}}
             </table>
         </div>
-        
+
         {{#if reservation.notes}}
         <div class="message">
             <strong>ご要望・備考:</strong><br>
             {{reservation.notes}}
         </div>
         {{/if}}
-        
+
         <div class="note">
             <strong>📌 ご注意事項</strong>
             <ul>
@@ -161,7 +177,7 @@
                 <li>ご不明な点がございましたら、店舗まで直接お問い合わせください</li>
             </ul>
         </div>
-        
+
         <div class="store-info">
             <h3>店舗情報</h3>
             <p>
@@ -170,11 +186,12 @@
                 {{#if store.phoneNumber}}📞 {{store.phoneNumber}}{{/if}}
             </p>
         </div>
-        
+
         <div class="footer">
             <p>このメールは {{store.name}} の予約システムから自動送信されています。</p>
             <p>&copy; {{currentYear}} {{store.name}}</p>
         </div>
     </div>
 </body>
+
 </html>

@@ -84,8 +84,11 @@ const statusLabels: Record<string, string> = {
 
 export default () => ({
     async sendReservationEmail(reservation: any, store: any, type: 'pending' | 'confirmed' | 'rejected' | 'cancelled') {
+        const requestId = Math.random().toString(36).substring(7);
+        console.log(`[Service:Email:${requestId}] sendReservationEmail called. Type=${type}, ResID=${reservation.id} (type: ${typeof reservation.id}), DocID=${reservation.documentId}`);
+
         if (!reservation.email) {
-            console.log('No email address provided, skipping email');
+            console.log(`[Service:Email:${requestId}] No email address provided, skipping email`);
             return { success: false, error: 'No email address' };
         }
 
@@ -136,8 +139,8 @@ export default () => ({
         };
 
         const html = template(variables);
-
         const transporter = createTransporter();
+
         if (!transporter) {
             console.log('SMTP not configured, email content:');
             console.log(`To: ${reservation.email}`);
@@ -155,6 +158,7 @@ export default () => ({
                 html,
             });
 
+            console.log(`[Service:Email:${requestId}] Email sent successfully. MessageId=${info.messageId}`);
             return { success: true, messageId: info.messageId };
         } catch (error: any) {
             console.error('Email sending error:', error);

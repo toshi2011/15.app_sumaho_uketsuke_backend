@@ -1,5 +1,18 @@
 import { factories } from '@strapi/strapi';
 import { timeToMinutes, normalizeBusinessHours } from '../../../utils/timeUtils';
+// import * as fs from 'fs';
+// import * as path from 'path';
+
+const log = (message: string) => {
+    try {
+        // const logPath = path.join(process.cwd(), 'debug_log.txt');
+        // const timestamp = new Date().toISOString();
+        // fs.appendFileSync(logPath, `[${timestamp}] ${message}\n`);
+        strapi.log.debug(`[StoreService] ${message}`);
+    } catch (e) {
+        // ignore
+    }
+};
 
 export default factories.createCoreService('api::store.store', ({ strapi }) => ({
     async checkAvailability(storeId, date, time, guests) {
@@ -90,6 +103,10 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
             // 予約終了時間が営業終了時間を超える場合は予約不可とします。
             // Rule C: Closing Time Constraint
             let closingMin = isLunch ? lunchEndMin : dinnerEndMin;
+
+            // Logging removed to fix build error
+            // strapi.log.debug(`[StoreService] Check...`);
+
             if (targetEndWithBuffer > closingMin) {
                 const maxPossible = closingMin - targetStartMin - currentCleanUp;
                 return {
@@ -97,7 +114,7 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
                     capacityUsed: 0,
                     requiredDuration,
                     reason: `Exceeds closing time. Max duration available: ${maxPossible} min`,
-                    action: 'reject' // 【仕様変更】常にrejectを返す（call_request等の曖昧なステータスを返さない）
+                    action: 'reject'
                 };
             }
 
@@ -184,7 +201,8 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
                     action: 'proceed',
                     candidateTable: candidate,
                     storeLocale: (store as any).locale,
-                    storeIdInt: (store as any).id
+                    storeIdInt: (store as any).id,
+                    bookingAcceptanceMode: (store as any).bookingAcceptanceMode
                 };
             } else {
                 return {

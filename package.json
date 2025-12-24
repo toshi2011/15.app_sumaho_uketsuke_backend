@@ -23,6 +23,7 @@
     "csv-parse": "^6.1.0",
     "csv-parser": "^3.2.0",
     "mime-types": "^3.0.2",
+    "node-fetch": "^3.3.2",
     "nodemailer": "^7.0.11",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",

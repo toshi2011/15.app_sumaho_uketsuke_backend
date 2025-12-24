@@ -245,6 +245,13 @@ export default {
                 }
             }
 
+            // ステータスに応じて日時フィールドを更新
+            if (status === 'confirmed' && previousStatus !== 'confirmed') {
+                updateData.confirmedAt = new Date();
+            } else if (['cancelled', 'rejected', 'no_show'].includes(status) && !['cancelled', 'rejected', 'no_show'].includes(previousStatus)) {
+                updateData.cancelledAt = new Date();
+            }
+
             // 予約を更新
             const updatedReservation = await strapi.db.query('api::reservation.reservation').update({
                 where: { id: reservation.id },
@@ -252,47 +259,10 @@ export default {
                 populate: ['store', 'assignedTables'],
             });
 
-            // ステータスが変更された場合、メール送信
-            if (previousStatus !== status && updatedReservation.email) {
-                const store = await strapi.db.query('api::store.store').findOne({
-                    where: { id: reservation.store?.id },
-                });
-
-                if (store) {
-                    try {
-                        // ownerReplyを含めた予約データでメール送信
-                        const reservationWithReply = {
-                            ...updatedReservation,
-                            ownerReply: ownerReply || updatedReservation.ownerReply,
-                        };
-
-                        if (status === 'confirmed') {
-                            await strapi.service('api::reservation.email').sendReservationEmail(
-                                reservationWithReply,
-                                store,
-                                'confirmed'
-                            );
-                            strapi.log.info(`Confirmation email sent for reservation ${updatedReservation.reservationNumber}`);
-                        } else if (status === 'rejected') {
-                            await strapi.service('api::reservation.email').sendReservationEmail(
-                                reservationWithReply,
-                                store,
-                                'rejected'
-                            );
-                            strapi.log.info(`Rejection email sent for reservation ${updatedReservation.reservationNumber}`);
-                        } else if (status === 'cancelled') {
-                            await strapi.service('api::reservation.email').sendReservationEmail(
-                                reservationWithReply,
-                                store,
-                                'cancelled'
-                            );
-                            strapi.log.info(`Cancellation email sent for reservation ${updatedReservation.reservationNumber}`);
-                        }
-                    } catch (emailError) {
-                        strapi.log.error('Failed to send status change email:', emailError);
-                        // メール送信に失敗してもステータス更新は成功とする
-                    }
-                }
+            // メール送信は lifecycles.ts の afterUpdate に任せるため、ここでは送信しない
+            // パターンA: ライフサイクル集約型
+            if (previousStatus !== status) {
+                strapi.log.info(`[OwnerController] Status updated for ${updatedReservation.reservationNumber}. Email will be handled by lifecycle.`);
             }
 
             ctx.body = {

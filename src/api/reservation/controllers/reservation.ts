@@ -41,6 +41,15 @@ export default factories.createCoreController('api::reservation.reservation', ({
                             delete data.locale;
                         }
 
+                        // FE-Custom: Handle Auto-Acceptance Logic
+                        // If store policy is 'auto', we automatically set status to 'confirmed'
+                        if (result.bookingAcceptanceMode === 'auto') {
+                            console.log(`[ReservationController] Auto-Acceptance Enabled. Promoting to confirmed.`);
+                            data.status = 'confirmed';
+                            // NOTE: Do NOT set confirmedAt here - it triggers afterUpdate to send duplicate email
+                            // The afterCreate lifecycle will handle email sending for confirmed status
+                        }
+
                         console.log(`[ReservationController] Auto-assigned table ${result.candidateTable.name} (${result.candidateTable.documentId})`);
                     } else {
                         // Should not happen if available=true in our logic, but fallback
@@ -50,6 +59,8 @@ export default factories.createCoreController('api::reservation.reservation', ({
             }
 
             console.log(`[ReservationController] Final Data Payload: Store=${data.store}, Tables=${data.assignedTables}, Locale=${data.locale}`);
+
+            // Logging removed to prevent EBUSY/locking issues
 
             const response = await super.create(ctx);
             return response;
