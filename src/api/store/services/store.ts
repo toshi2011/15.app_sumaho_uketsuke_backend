@@ -62,7 +62,16 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
 
             // Integer Conversion
             const lunchStartMin = timeToMinutes(lunchStartStr);
+
+            // Use lastOrder if available
+            const lunchLastOrderStr = bh.lunch?.lastOrder;
             const lunchEndMin = normalizeBusinessHours(lunchStartMin, timeToMinutes(lunchEndStr));
+
+            let lunchLastOrderMin = lunchEndMin;
+            if (lunchLastOrderStr) {
+                lunchLastOrderMin = normalizeBusinessHours(lunchStartMin, timeToMinutes(lunchLastOrderStr));
+            }
+
             const dinnerStartMin = timeToMinutes(dinnerStartStr);
             let dinnerEndMin = timeToMinutes(dinnerEndStr);
             dinnerEndMin = normalizeBusinessHours(dinnerStartMin, dinnerEndMin);
@@ -76,6 +85,7 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
             let currentCleanUp = 0;
             let currentBaseDuration = 90;
 
+            // Rule B: Range Classification & Gap Check
             if (targetStartMin >= lunchStartMin && targetStartMin < lunchEndMin) {
                 isLunch = true;
                 currentCleanUp = lunchCleanUp;
@@ -85,8 +95,13 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
                 currentCleanUp = dinnerCleanUp;
                 currentBaseDuration = dinnerDuration;
             } else {
-                currentCleanUp = dinnerCleanUp;
-                currentBaseDuration = dinnerDuration;
+                return {
+                    available: false,
+                    capacityUsed: 0,
+                    requiredDuration: 0,
+                    reason: `Outside of business hours. Lunch: ${lunchStartStr}~${lunchEndStr}, Dinner: ${dinnerStartStr}~${dinnerEndStr}`,
+                    action: 'reject'
+                };
             }
 
             // Duration Calculation
@@ -99,23 +114,44 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
             const targetEndWithBuffer = targetEndMin + currentCleanUp;
 
             // 【仕様変更】
-            // 閉店ルールは「厳格（時間内退店）」のみサポートします。
-            // 予約終了時間が営業終了時間を超える場合は予約不可とします。
+            // 閉店ルールはランチとディナーで異なります。
+            // ランチ: ラストオーダー方式 (終了時間の15分前までに入店すればOK)
+            // ディナー: 厳格な閉店時間 (退店時間が閉店時間を超えてはいけない)
             // Rule C: Closing Time Constraint
+
             let closingMin = isLunch ? lunchEndMin : dinnerEndMin;
 
-            // Logging removed to fix build error
-            // strapi.log.debug(`[StoreService] Check...`);
+            if (isLunch) {
+                // Lunch: Last Order Logic
+                // Allow if start time is <= LO - 15 min
+                // lunchLastOrderMin is either proper LO time or End time if LO not set.
 
-            if (targetEndWithBuffer > closingMin) {
-                const maxPossible = closingMin - targetStartMin - currentCleanUp;
-                return {
-                    available: false,
-                    capacityUsed: 0,
-                    requiredDuration,
-                    reason: `Exceeds closing time. Max duration available: ${maxPossible} min`,
-                    action: 'reject'
-                };
+                const lastOrderLimit = lunchLastOrderMin - 15;
+
+                if (targetStartMin > lastOrderLimit) {
+                    // Determine string to show for LO
+                    const loTimeStr = lunchLastOrderStr || lunchEndStr;
+                    return {
+                        available: false,
+                        capacityUsed: 0,
+                        requiredDuration,
+                        reason: `Lunch Last Order exceeded. LO is 15 min before ${loTimeStr}. Max start: ${lastOrderLimit} min. Target: ${targetStartMin}`,
+                        action: 'reject'
+                    };
+                }
+                // For Lunch, we DO NOT check if targetEndWithBuffer > closingMin.
+            } else {
+                // Dinner: Strict Closing Logic
+                if (targetEndWithBuffer > closingMin) {
+                    const maxPossible = closingMin - targetStartMin - currentCleanUp;
+                    return {
+                        available: false,
+                        capacityUsed: 0,
+                        requiredDuration,
+                        reason: `Exceeds closing time. Max duration available: ${maxPossible} min`,
+                        action: 'reject'
+                    };
+                }
             }
 
             // 4. Rule A: Table Inventory Check
