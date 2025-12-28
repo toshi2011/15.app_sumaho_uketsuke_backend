@@ -895,6 +895,9 @@ export interface ApiTableTable extends Struct.CollectionTypeSchema {
       'api::reservation.reservation'
     >;
     store: Schema.Attribute.Relation<'manyToOne', 'api::store.store'>;
+    type: Schema.Attribute.Enumeration<['counter', 'table', 'private']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'table'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;

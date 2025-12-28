@@ -1,0 +1,17 @@
+--- 1. Inspect Tables ---
+Store: イタリアン・トラットリア
+Table: テーブル1 | Type: table | Cap: 4 | Max: 6
+Table: テーブル2 | Type: counter | Cap: 4 | Max: 6
+Table: テーブル3 | Type: table | Cap: 2 | Max: 4
+
+--- 2. Test Allocation: 2 Guests ---
+Assigned: テーブル2 (Type: counter)
+
+--- 3. Test Allocation: 4 Guests ---
+Assigned: テーブル3 (Type: table)
+
+--- 4. Test Note Preference ---
+Note: "カウンター希望です"
+Has Preference? true
+Store Mode: auto
+Result: Status would be PENDING (Correct)

@@ -1,0 +1,9 @@
+Updating テーブル1 to type: table
+TypeError: Cannot read properties of null (reading 'type')
+Updating テーブル1 (DocID: g9vpt5kpqkukyfov2itm6e69) to type: table
+Updated テーブル1: Type is now table
+Updating テーブル2 (DocID: nbbvgxltkr7yjpqcp6g25xth) to type: counter
+Updated テーブル2: Type is now counter
+Updating テーブル3 (DocID: jp5lqc2dmr9qxvn7nhuz0bqv) to type: table
+Updated テーブル3: Type is now table
+Update complete.

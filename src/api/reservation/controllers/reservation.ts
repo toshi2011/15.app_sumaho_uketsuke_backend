@@ -24,6 +24,11 @@ export default factories.createCoreController('api::reservation.reservation', ({
                         });
                     }
 
+                    // 席の希望キーワードチェック
+                    const seatPreferenceKeywords = ['テーブル', 'カウンター', '個室', '席', '指定', '希望'];
+                    const hasSeatPreference = data.notes && seatPreferenceKeywords.some((key: string) => data.notes.includes(key));
+
+
                     if (result.candidateTable) {
                         // Use Document ID for relation in Strapi 5
                         data.assignedTables = [result.candidateTable.documentId];
@@ -44,8 +49,15 @@ export default factories.createCoreController('api::reservation.reservation', ({
                         // FE-Custom: Handle Auto-Acceptance Logic
                         // If store policy is 'auto', we automatically set status to 'confirmed'
                         if (result.bookingAcceptanceMode === 'auto') {
-                            console.log(`[ReservationController] Auto-Acceptance Enabled. Promoting to confirmed.`);
-                            data.status = 'confirmed';
+                            if (hasSeatPreference) {
+                                console.log(`[ReservationController] Seat preference detected. Downgrading to pending.`);
+                                data.status = 'pending'; // 店主確認が必要
+                                data.requiresReview = true;
+                                data.reviewReason = '席タイプ指定の希望があります';
+                            } else {
+                                console.log(`[ReservationController] Auto-Acceptance Enabled. Promoting to confirmed.`);
+                                data.status = 'confirmed';
+                            }
                             // NOTE: Do NOT set confirmedAt here - it triggers afterUpdate to send duplicate email
                             // The afterCreate lifecycle will handle email sending for confirmed status
                         }

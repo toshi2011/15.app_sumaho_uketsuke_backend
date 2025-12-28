@@ -60,9 +60,9 @@ export default {
                     console.log(`[Bootstrap] Creating default tables for store ${store.name} (ID: ${store.id})...`);
 
                     const defaultTables = [
-                        { name: 'テーブル1', baseCapacity: 4, maxCapacity: 6, isActive: true },
-                        { name: 'テーブル2', baseCapacity: 4, maxCapacity: 6, isActive: true },
-                        { name: 'テーブル3', baseCapacity: 2, maxCapacity: 4, isActive: true },
+                        { name: 'テーブル1', baseCapacity: 4, maxCapacity: 6, isActive: true, type: 'table' as const },
+                        { name: 'テーブル2', baseCapacity: 4, maxCapacity: 6, isActive: true, type: 'table' as const },
+                        { name: 'テーブル3', baseCapacity: 2, maxCapacity: 4, isActive: true, type: 'table' as const },
                     ];
 
                     for (const dt of defaultTables) {

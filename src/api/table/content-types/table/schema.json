@@ -38,6 +38,16 @@
             "target": "api::store.store",
             "inversedBy": "tables"
         },
+        "type": {
+            "type": "enumeration",
+            "enum": [
+                "counter",
+                "table",
+                "private"
+            ],
+            "default": "table",
+            "required": true
+        },
         "reservations": {
             "type": "relation",
             "relation": "manyToMany",

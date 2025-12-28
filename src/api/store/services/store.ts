@@ -210,22 +210,51 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
 
             console.log(`[DEBUG] Tables Total: ${tables.length}, Active: ${activeTables.length}, Used: ${usedTableIds.size}, Free: ${availableTables.length}, Unassigned Res: ${unassignedReservationCount}`);
 
-            // Find candidates
-            // Strategy: Find ANY single table that fits 'guests'
-            // We compare guests vs maxCapacity (or baseCapacity?)
-            // Usually maxCapacity is the hard limit.
-
-            // Note: If unassignedReservationCount > 0, we technically have "Ghost" usage. 
-            // In a strict system, we might subtract `unassignedReservationCount` from the count of available tables?
-            // But we don't know the capacity of those unassigned bookings.
-            // For now, we proceed with availableTables but LOG the warning.
-
-            const candidate = availableTables.find((t: any) => {
-                const tMax = t.maxCapacity || t.baseCapacity || t.capacity || 20; // Robust fallback
+            // 5. 【最適化エンジン】優先順位に基づいたソート
+            // 4. 収容可能（人数が収まる）な席に絞り込み
+            const candidateTables = availableTables.filter((t: any) => {
+                const tMax = t.maxCapacity || t.baseCapacity || t.capacity || 20;
                 return tMax >= guests;
             });
 
-            if (candidate) {
+            if (candidateTables.length === 0) {
+                return {
+                    available: false,
+                    capacityUsed: 100, // Effectively full for this request
+                    requiredDuration,
+                    reason: 'No suitable table available',
+                    action: 'reject'
+                };
+            }
+
+            candidateTables.sort((a: any, b: any) => {
+                // ルール1: 人数による席タイプの優先順位
+                // typeプロパティがない場合は 'table' とみなす
+                const typeA = a.type || 'table';
+                const typeB = b.type || 'table';
+
+                const priority = (guests <= 2)
+                    ? { counter: 1, table: 2, private: 3 } // 少人数はカウンター優先
+                    : { table: 1, private: 2, counter: 3 }; // 大人数はテーブル優先
+
+                // priorityMapにないキーが来た場合のフォールバック
+                const pA = priority[typeA as keyof typeof priority] ?? 99;
+                const pB = priority[typeB as keyof typeof priority] ?? 99;
+
+                if (pA !== pB) {
+                    return pA - pB;
+                }
+
+                // ルール2: ベストフィット（最小の席を先に使う）
+                // 定員が予約人数に近い方を優先（例：2名予約で、4名席より2名席を先に使う）
+                const maxCapacityA = a.maxCapacity || a.baseCapacity || 99;
+                const maxCapacityB = b.maxCapacity || b.baseCapacity || 99;
+                return maxCapacityA - maxCapacityB;
+            });
+
+            const bestTable = candidateTables[0];
+
+            if (bestTable) {
                 // Determine capacity usage roughly
                 const totalUsed = overlappingReservations.reduce((acc, r) => acc + (r.guests || 0), 0);
                 const capacityUsed = Math.round((totalUsed / (store.maxCapacity || 100)) * 100);
@@ -235,15 +264,16 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
                     capacityUsed,
                     requiredDuration,
                     action: 'proceed',
-                    candidateTable: candidate,
+                    candidateTable: bestTable,
                     storeLocale: (store as any).locale,
                     storeIdInt: (store as any).id,
                     bookingAcceptanceMode: (store as any).bookingAcceptanceMode
                 };
             } else {
+                // Should be covered by length check above, but safe fallback
                 return {
                     available: false,
-                    capacityUsed: 100, // Effectively full for this request
+                    capacityUsed: 100,
                     requiredDuration,
                     reason: 'No suitable table available',
                     action: 'reject'
