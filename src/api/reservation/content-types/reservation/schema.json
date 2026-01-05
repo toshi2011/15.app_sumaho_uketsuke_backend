@@ -25,6 +25,10 @@
             "required": true,
             "min": 1
         },
+        "duration": {
+            "type": "integer",
+            "default": 120
+        },
         "course": {
             "type": "string"
         },

@@ -605,6 +605,7 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     customer: Schema.Attribute.Relation<'manyToOne', 'api::customer.customer'>;
     date: Schema.Attribute.Date;
+    duration: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<120>;
     email: Schema.Attribute.Email;
     guests: Schema.Attribute.Integer &
       Schema.Attribute.Required &
