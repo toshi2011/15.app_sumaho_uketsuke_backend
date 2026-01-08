@@ -1,3 +1,4 @@
+// Force Rebuild Timestamp
 import { factories } from '@strapi/strapi';
 import { timeToMinutes, normalizeBusinessHours } from '../../../utils/timeUtils';
 // import * as fs from 'fs';
@@ -105,10 +106,10 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
             }
 
             // Duration Calculation
-            const dynamicDurationRate = store.dynamicDurationRate ?? 10;
-            const extraGuests = Math.max(0, guests - 2);
-            const addedTime = extraGuests * dynamicDurationRate;
-            let requiredDuration = Math.min(currentBaseDuration + addedTime, maxDurationLimit);
+            // Duration Calculation
+            // 【仕様変更】人数による自動延長機能（dynamicDurationRate）を廃止
+            // 常に店舗設定のランチ/ディナー滞在時間を適用する
+            let requiredDuration = Math.min(currentBaseDuration, maxDurationLimit);
 
             const targetEndMin = targetStartMin + requiredDuration;
             const targetEndWithBuffer = targetEndMin + currentCleanUp;
@@ -177,9 +178,8 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
                 let rBase = rIsLunch ? lunchDuration : dinnerDuration;
                 let rCleanUp = rIsLunch ? lunchCleanUp : dinnerCleanUp;
 
-                const rGuests = res.guests || 2;
-                const rExtra = Math.max(0, rGuests - 2);
-                const rDuration = Math.min(rBase + rExtra * dynamicDurationRate, maxDurationLimit);
+                // 【仕様変更】既存予約の所要時間計算も一律設定を適用
+                const rDuration = Math.min(rBase, maxDurationLimit);
 
                 const resEnd = resStart + rDuration;
                 const theirEnd = resEnd + rCleanUp;
@@ -212,51 +212,110 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
 
             // 5. 【最適化エンジン】優先順位に基づいたソート
             // 4. 収容可能（人数が収まる）な席に絞り込み
-            const candidateTables = availableTables.filter((t: any) => {
-                const tMax = t.maxCapacity || t.baseCapacity || t.capacity || 20;
-                return tMax >= guests;
-            });
+            let assignedTables: any[] = [];
+            let candidateTable: any = null;
 
-            if (candidateTables.length === 0) {
-                return {
-                    available: false,
-                    capacityUsed: 100, // Effectively full for this request
-                    requiredDuration,
-                    reason: 'No suitable table available',
-                    action: 'reject'
-                };
-            }
+            // 特殊ロジック: カウンター席（定員1名）の複数割り当て
+            // 条件: ゲスト数 <= 4 (あまり大人数でカウンター連番は難しいため制限してもよいが、ここでは柔軟に)
+            // かつ、カウンター席の在庫がある場合
+            const counterSeats = availableTables.filter((t: any) =>
+                (t.type === 'counter' || t.name.includes('カウンター')) &&
+                (t.maxCapacity === 1 || t.capacity === 1)
+            );
 
-            candidateTables.sort((a: any, b: any) => {
-                // ルール1: 人数による席タイプの優先順位
-                // typeプロパティがない場合は 'table' とみなす
-                const typeA = a.type || 'table';
-                const typeB = b.type || 'table';
+            // カウンターロジックを試行するか？（少人数、またはカウンター希望ロジックがあれば）
+            // ここでは「カウンター席が人数分以上空いていれば」優先的にチェックする戦略とします。
+            // ただし、テーブル席の方が良い場合もあるため、あくまで「候補」として並列で考えるか、
+            // 「2名以下ならカウンター優先」などのルールに従う。
 
-                const priority = (guests <= 2)
-                    ? { counter: 1, table: 2, private: 3 } // 少人数はカウンター優先
-                    : { table: 1, private: 2, counter: 3 }; // 大人数はテーブル優先
+            // ルール: 2名以下ならカウンターを優先して確保を試みる
+            // それ以上、またはカウンター確保失敗ならテーブル席を探す
 
-                // priorityMapにないキーが来た場合のフォールバック
-                const pA = priority[typeA as keyof typeof priority] ?? 99;
-                const pB = priority[typeB as keyof typeof priority] ?? 99;
+            let counterSuccess = false;
 
-                if (pA !== pB) {
-                    return pA - pB;
+            if (guests <= 3 && counterSeats.length >= guests) {
+                // ソート（名前順やsortOrder順）
+                counterSeats.sort((a: any, b: any) => (a.sortOrder || 999) - (b.sortOrder || 999));
+
+                // 1. 連番（Sequential）チェック
+                for (let i = 0; i <= counterSeats.length - guests; i++) {
+                    const block = counterSeats.slice(i, i + guests);
+                    // block内の席が本当に連番か確認（sortOrderが連続しているか）
+                    // データ不整合でsortOrderが飛んでいる場合もあるので、厳密にするならここでチェック
+                    // 今回は単純にリスト上の並びで判断（「空いている席」の並びなので、物理的に隣とは限らないが...
+                    // 修正: これだと「C1, C3」が空いている時に連番とみなされる。
+                    // 物理的な連番チェックにはSortOrderの差を見る必要がある。
+                    const isSequential = block.every((t: any, idx: number) => {
+                        if (idx === 0) return true;
+                        return (t.sortOrder - block[idx - 1].sortOrder) === 1;
+                    });
+
+                    if (isSequential) {
+                        assignedTables = block;
+                        counterSuccess = true;
+                        console.log(`[StoreService] Assigned Sequential Counters: ${block.map((t: any) => t.name).join(', ')}`);
+                        break;
+                    }
                 }
 
-                // ルール2: ベストフィット（最小の席を先に使う）
-                // 定員が予約人数に近い方を優先（例：2名予約で、4名席より2名席を先に使う）
-                const maxCapacityA = a.maxCapacity || a.baseCapacity || 99;
-                const maxCapacityB = b.maxCapacity || b.baseCapacity || 99;
-                return maxCapacityA - maxCapacityB;
-            });
+                // 2. バラ席（Scattered）チェック（連番失敗時）
+                // 2名ならバラ席でも許容するか？ -> 基本は連番推奨だが、空いていれば案内可能とするか。
+                if (!counterSuccess && guests <= 2) { // 2名までならバラでもOKとする
+                    assignedTables = counterSeats.slice(0, guests);
+                    counterSuccess = true;
+                    console.log(`[StoreService] Assigned Scattered Counters: ${assignedTables.map((t: any) => t.name).join(', ')}`);
+                }
+            }
 
-            const bestTable = candidateTables[0];
+            if (counterSuccess) {
+                // カウンター確保成功。
+                // candidateTable（代表）は最初の席にしておく（後方互換性のため）
+                candidateTable = assignedTables[0];
+            } else {
+                // 既存のテーブルロジック（単一テーブルで収まる場所を探す）
+                const candidateTables = availableTables.filter((t: any) => {
+                    const tMax = t.maxCapacity || t.baseCapacity || t.capacity || 20;
+                    return tMax >= guests;
+                });
 
-            if (bestTable) {
+                if (candidateTables.length === 0) {
+                    return {
+                        available: false,
+                        capacityUsed: 100, // Effectively full for this request
+                        requiredDuration,
+                        reason: 'No suitable table available',
+                        action: 'reject'
+                    };
+                }
+
+                candidateTables.sort((a: any, b: any) => {
+                    // ルール1: 人数による席タイプの優先順位
+                    const typeA = a.type || 'table';
+                    const typeB = b.type || 'table';
+
+                    const priority = (guests <= 2)
+                        ? { counter: 1, table: 2, private: 3 } // 少人数はカウンター（ここに来るのはCap>=2のカウンターがある場合）
+                        : { table: 1, private: 2, counter: 3 };
+
+                    const pA = priority[typeA as keyof typeof priority] ?? 99;
+                    const pB = priority[typeB as keyof typeof priority] ?? 99;
+
+                    if (pA !== pB) return pA - pB;
+
+                    // ルール2: ベストフィット
+                    const maxCapacityA = a.maxCapacity || a.baseCapacity || 99;
+                    const maxCapacityB = b.maxCapacity || b.baseCapacity || 99;
+                    return maxCapacityA - maxCapacityB;
+                });
+
+                candidateTable = candidateTables[0];
+                assignedTables = [candidateTable];
+            }
+
+
+            if (candidateTable) {
                 // Determine capacity usage roughly
-                const totalUsed = overlappingReservations.reduce((acc, r) => acc + (r.guests || 0), 0);
+                const totalUsed = overlappingReservations.reduce((acc, r: any) => acc + (r.guests || 0), 0);
                 const capacityUsed = Math.round((totalUsed / (store.maxCapacity || 100)) * 100);
 
                 return {
@@ -264,7 +323,8 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
                     capacityUsed,
                     requiredDuration,
                     action: 'proceed',
-                    candidateTable: bestTable,
+                    candidateTable: candidateTable,
+                    assignedTables: assignedTables, // 新規追加: 複数テーブル配列
                     storeLocale: (store as any).locale,
                     storeIdInt: (store as any).id,
                     bookingAcceptanceMode: (store as any).bookingAcceptanceMode

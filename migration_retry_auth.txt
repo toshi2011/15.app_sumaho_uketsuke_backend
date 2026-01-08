@@ -1,0 +1,1 @@
+{"success":true,"message":"Created 10 Counter Seats (Cap 1). Migrated 2/2. Archived 4 tables.","log":["Res 71 (Checkout Test User, 2p) -> 2 seats","Res 84 (tanaka kazuko0108-1200_2, 2p) -> 2 seats"]}

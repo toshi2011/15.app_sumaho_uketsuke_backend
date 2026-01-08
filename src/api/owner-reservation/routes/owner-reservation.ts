@@ -55,5 +55,15 @@ export default {
                 description: '早期退店（完了ステータスへ変更・時間短縮）',
             },
         },
+        {
+            method: 'POST',
+            path: '/owner/reservations/fix-counters',
+            handler: 'owner-reservation.fixCounters',
+            config: {
+                policies: [],
+                middlewares: [],
+                description: 'Migration: Fix Counters',
+            },
+        },
     ],
 };

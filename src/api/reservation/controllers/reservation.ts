@@ -24,15 +24,29 @@ export default factories.createCoreController('api::reservation.reservation', ({
                         });
                     }
 
+                    // 【追加】計算された所要時間を保存データにセットする
+                    // これにより、デフォルト値（120分）ではなく、店舗設定（60分等）が適用される
+                    if (result.requiredDuration) {
+                        data.duration = result.requiredDuration;
+                    }
+
                     // 席の希望キーワードチェック
                     const seatPreferenceKeywords = ['テーブル', 'カウンター', '個室', '席', '指定', '希望'];
                     const hasSeatPreference = data.notes && seatPreferenceKeywords.some((key: string) => data.notes.includes(key));
 
 
-                    if (result.candidateTable) {
+                    if (result.assignedTables && result.assignedTables.length > 0) {
+                        // 複数テーブル（カウンターなど）が割り当てられた場合
+                        data.assignedTables = result.assignedTables.map((t: any) => t.documentId);
+
+                        console.log(`[ReservationController] Auto-assigned ${result.assignedTables.length} tables: ${result.assignedTables.map((t: any) => t.name).join(', ')}`);
+                    } else if (result.candidateTable) {
                         // Use Document ID for relation in Strapi 5
                         data.assignedTables = [result.candidateTable.documentId];
+                        console.log(`[ReservationController] Auto-assigned table ${result.candidateTable.name} (${result.candidateTable.documentId})`);
+                    }
 
+                    if (data.assignedTables && data.assignedTables.length > 0) {
                         // Attempt to fix Store relation error by using Integer ID if DocID fails?
                         if (result.storeIdInt) {
                             data.store = result.storeIdInt;
@@ -61,8 +75,6 @@ export default factories.createCoreController('api::reservation.reservation', ({
                             // NOTE: Do NOT set confirmedAt here - it triggers afterUpdate to send duplicate email
                             // The afterCreate lifecycle will handle email sending for confirmed status
                         }
-
-                        console.log(`[ReservationController] Auto-assigned table ${result.candidateTable.name} (${result.candidateTable.documentId})`);
                     } else {
                         // Should not happen if available=true in our logic, but fallback
                         console.warn('[ReservationController] Available but no candidate table returned?');

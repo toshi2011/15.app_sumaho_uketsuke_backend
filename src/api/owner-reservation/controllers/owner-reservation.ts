@@ -21,6 +21,10 @@ export default {
                 store: { documentId: storeId },
             };
 
+            console.log(`[OwnerRes] List Request. StoreID: ${storeId}`);
+            console.log(`[OwnerRes] Query:`, ctx.request.query);
+            console.log(`[OwnerRes] Initial Filter:`, JSON.stringify(where));
+
             // 日付フィルタ
             if (date) {
                 where.date = date;
@@ -48,21 +52,25 @@ export default {
             const offset = (parseInt(page as string) - 1) * parseInt(pageSize as string);
             const limit = parseInt(pageSize as string);
 
-            // 予約を取得
-            const reservations = await strapi.db.query('api::reservation.reservation').findMany({
-                where,
-                orderBy: [{ date: 'asc' }, { time: 'asc' }],
-                offset,
+            // 予約を取得 (Use Document Service for Draft/Publish handling)
+            const reservations = await strapi.documents('api::reservation.reservation').findMany({
+                filters: where,
+                sort: ['date:desc', 'time:asc'],
+                start: offset,
                 limit,
                 populate: ['assignedTables', 'customer'],
+                status: 'draft', // Fetch draft version to show latest "Modified" changes immediately
             });
 
             // 総件数を取得
-            const total = await strapi.db.query('api::reservation.reservation').count({ where });
+            const total = await strapi.documents('api::reservation.reservation').count({
+                filters: where,
+                status: 'published',
+            });
 
             // BE-104: 各予約に対してcustomerStatsを取得
             const dataWithStats = await Promise.all(
-                reservations.map(async (r) => {
+                reservations.map(async (r: any) => {
                     // 電話番号がある場合は履歴を検索
                     let customerStats = null;
                     if (r.phone) {
@@ -73,9 +81,10 @@ export default {
                     }
 
                     return {
-                        id: r.documentId,
+                        id: r.id, // Numeric ID
+                        documentId: r.documentId, // Document ID
                         reservationNumber: r.reservationNumber,
-                        guestName: r.guestName,
+                        name: r.name, // Ensure 'name' is returned matching frontend expectation
                         email: r.email,
                         phone: r.phone,
                         date: r.date,
@@ -90,12 +99,14 @@ export default {
                         requiresAttention: r.requiresAttention,
                         isOwnerEntry: r.isOwnerEntry,
                         assignedTables: r.assignedTables?.map((t: any) => ({
-                            id: t.documentId,
+                            id: t.id, // Numeric ID
+                            documentId: t.documentId, // Document ID
                             name: t.name,
                             capacity: t.capacity,
                         })) || [],
                         customer: r.customer ? {
-                            id: r.customer.documentId,
+                            id: r.customer.id, // Numeric ID
+                            documentId: r.customer.documentId, // Document ID
                             name: r.customer.name,
                             totalVisits: r.customer.totalVisits,
                         } : null,
@@ -318,26 +329,49 @@ export default {
                 return (startMin < resEnd) && (resStart < endMin);
             });
 
+            // Deduplicate by Document ID (handle Draft/Published versions)
+            const uniqueConflicts = realConflicts.filter((res: any, index: number, self: any[]) =>
+                index === self.findIndex((t) => t.documentId === res.documentId)
+            );
+
             strapi.log.info(`[Update Debug] Conflict Check. Date: ${checkDate}, Time: ${checkTime}, AssTables: ${JSON.stringify(newAssignedTables)}`);
-            strapi.log.info(`[Update Debug] Conflicting Candidates: ${conflictingReservations.length}, Real Conflicts: ${realConflicts.length}`);
+            strapi.log.info(`[Update Debug] Conflicting Candidates: ${conflictingReservations.length}, Real Conflicts: ${realConflicts.length}, Unique: ${uniqueConflicts.length}`);
 
             // ==========================================
             // Check Mode Result
             // ==========================================
             if (strategy === 'check') {
-                if (realConflicts.length > 0) {
+                if (uniqueConflicts.length > 0) {
                     ctx.status = 409;
-                    return ctx.body = {
+                    const conflictResponse: any = {
                         success: false,
                         conflictType: 'overlap',
-                        conflictingReservations: realConflicts.map((r: any) => ({
+                        conflictingReservations: uniqueConflicts.map((r: any) => ({
                             id: r.documentId,
                             reservationNumber: r.reservationNumber,
                             time: r.time,
-                            guestName: r.guestName,
+                            guestName: r.name,
                             assignedTables: r.assignedTables.map((t: any) => ({ id: t.documentId, name: t.name }))
-                        }))
+                        })),
+                        reason: `${uniqueConflicts.length} reservations conflict with this slot.`,
                     };
+
+                    // Swap Suggestion Logic
+                    console.log(`[Update Debug] Conflict Count: ${uniqueConflicts.length}`);
+                    if (uniqueConflicts.length === 1) {
+                        // Simple 1-on-1 swap
+                        const target = uniqueConflicts[0];
+                        console.log(`[Update Debug] Swap Candidate Found: ${target.documentId} (${target.name})`);
+
+                        // Optionally check if tables counts match, but for now allow strict 1-to-1 reservation swap
+                        conflictResponse.action = 'swap';
+                        conflictResponse.targetReservationId = target.documentId;
+                        conflictResponse.reason = `Conflict with ${target.name}. Swap seats?`;
+                    } else {
+                        console.log(`[Update Debug] No Swap: Conflict count is ${uniqueConflicts.length}`);
+                    }
+
+                    return ctx.body = conflictResponse;
                 }
 
                 // コンフリクトなし -> 更新実行
@@ -360,17 +394,23 @@ export default {
                 // Remove id from updateData as update() uses documentId
                 const { id, ...dataToUpdate } = updateData;
 
-                const updated = await strapi.documents('api::reservation.reservation').update({
+                // Update Draft first
+                const updatedDraft = await strapi.documents('api::reservation.reservation').update({
                     documentId: reservation.documentId,
                     data: dataToUpdate,
-                    status: 'published', // Force Publish to update Live data
+                    populate: ['assignedTables'],
+                });
+
+                // Explicitly Publish
+                const published = await strapi.documents('api::reservation.reservation').publish({
+                    documentId: reservation.documentId,
                     populate: ['assignedTables'],
                 });
 
                 strapi.log.info(`[Update Debug] Force update executed. DocID: ${reservation.documentId}`);
-                strapi.log.info(`[Update Debug] Updated Reservation Assigned Tables: ${JSON.stringify(updated.assignedTables ? updated.assignedTables.map((t: any) => t.name) : 'undefined')}`);
+                strapi.log.info(`[Update Debug] Published Reservation Assigned Tables: ${JSON.stringify((published as any).assignedTables ? (published as any).assignedTables.map((t: any) => t.name) : 'undefined')}`);
 
-                return ctx.body = { success: true, data: updated };
+                return ctx.body = { success: true, data: published };
             }
 
             // ==========================================
@@ -409,25 +449,31 @@ export default {
                 const tablesForSource = newAssignedTables;
                 const tablesForTargetRes = reservation.assignedTables.map((t: any) => t.documentId);
 
-                // Update Source
-                const updatedSource = await strapi.documents('api::reservation.reservation').update({
+                // Update Source (Draft)
+                await strapi.documents('api::reservation.reservation').update({
                     documentId: reservation.documentId,
                     data: {
                         assignedTables: tablesForSource,
                         time: updateData.time || reservation.time,
                         date: updateData.date || reservation.date
                     },
-                    status: 'published', // Force Publish
                     populate: ['assignedTables']
                 });
+                // Publish Source
+                await strapi.documents('api::reservation.reservation').publish({
+                    documentId: reservation.documentId,
+                });
 
-                // Update Target
-                const updatedTarget = await strapi.documents('api::reservation.reservation').update({
+                // Update Target (Draft)
+                await strapi.documents('api::reservation.reservation').update({
                     documentId: targetRes.documentId,
                     data: {
                         assignedTables: tablesForTargetRes
                     },
-                    status: 'published', // Force Publish
+                });
+                // Publish Target
+                await strapi.documents('api::reservation.reservation').publish({
+                    documentId: targetRes.documentId,
                 });
 
                 strapi.log.info(`[Update Debug] Swapped. Source(${reservation.documentId})->${JSON.stringify(tablesForSource)}, Target(${targetRes.documentId})->${JSON.stringify(tablesForTargetRes)}`);
@@ -512,4 +558,150 @@ export default {
             ctx.internalServerError('Failed to checkout');
         }
     },
+    async fixCounters(ctx) {
+    let storeId = ctx.request.header['x-store-id'];
+    if (!storeId) return ctx.badRequest('No Store ID');
+
+    try {
+        // Validate/Resolve Store ID
+        if (!isNaN(Number(storeId))) {
+            const store = await strapi.db.query('api::store.store').findOne({ where: { id: storeId } });
+            if (store) storeId = store.documentId;
+        }
+
+        // Cleanup: Archive ANY existing Active table with "カウンター" in name
+        const oldTables = await strapi.documents('api::table.table').findMany({
+            filters: {
+                store: { documentId: storeId },
+                name: { $contains: 'カウンター' },
+                isActive: true
+            }
+        });
+
+        console.log(`[Migration] Archiving ${oldTables.length} existing counter tables...`);
+        for (const t of oldTables) {
+            await strapi.documents('api::table.table').update({
+                documentId: t.documentId,
+                data: {
+                    name: `(Archived) ${t.name}`,
+                    isActive: false
+                }
+            });
+        }
+
+        // Create 10 New Counter Tables (Cap 1)
+        const newTables = [];
+        for (let i = 1; i <= 10; i++) {
+            const newT = await strapi.documents('api::table.table').create({
+                data: {
+                    name: `カウンター${i}`,
+                    capacity: 1,
+                    maxCapacity: 1,
+                    baseCapacity: 1,
+                    isActive: true,
+                    type: 'counter',
+                    store: storeId,
+                    sortOrder: i
+                } as any,
+                status: 'published'
+            });
+            newTables.push(newT);
+        }
+
+        // Migrate Existing Reservations
+        const archivedIds = oldTables.map((t: any) => t.documentId);
+        const reservations = await strapi.documents('api::reservation.reservation').findMany({
+            filters: {
+                store: { documentId: storeId },
+                assignedTables: { documentId: { $in: archivedIds } },
+                status: { $ne: 'canceled' },
+            },
+            populate: ['assignedTables']
+        });
+
+        console.log(`[Migration] Found ${reservations.length} reservations to migrate.`);
+
+        let migratedCount = 0;
+        const migrationLog = [];
+
+        // Simple In-Memory State for Overlap Check
+        const seatOccupancy: Record<string, any[]> = {};
+        newTables.forEach((t: any) => seatOccupancy[t.documentId] = []);
+
+        const checkOverlap = (existingRes: any, newRes: any) => {
+            try {
+                const partsA = existingRes.time.split(':');
+                const startA = parseInt(partsA[0]) * 60 + parseInt(partsA[1]);
+                const endA = startA + (existingRes.duration || 90);
+
+                const partsB = newRes.time.split(':');
+                const startB = parseInt(partsB[0]) * 60 + parseInt(partsB[1]);
+                const endB = startB + (newRes.duration || 90);
+
+                if (existingRes.date !== newRes.date) return false;
+                return (startA < endB) && (startB < endA);
+            } catch { return true; }
+        };
+
+        for (const res of reservations) {
+            const guests = res.guests || 2;
+            let assignedIds: string[] = [];
+            let found = false;
+
+            // 1. Try Sequential Blocks (BEST FIT logic)
+            for (let i = 0; i <= newTables.length - guests; i++) {
+                const block = newTables.slice(i, i + guests);
+                const isBlockFree = block.every((table: any) => {
+                    return !seatOccupancy[table.documentId].some((existing: any) => checkOverlap(existing, res));
+                });
+
+                if (isBlockFree) {
+                    assignedIds = block.map((t: any) => t.documentId);
+                    found = true;
+                    break;
+                }
+            }
+
+            // 2. If not sequential, try Scattered
+            if (!found) {
+                const freeTables = newTables.filter((table: any) => {
+                    return !seatOccupancy[table.documentId].some((existing: any) => checkOverlap(existing, res));
+                });
+                if (freeTables.length >= guests) {
+                    assignedIds = freeTables.slice(0, guests).map((t: any) => t.documentId);
+                    found = true;
+                }
+            }
+
+            if (found) {
+                assignedIds.forEach(id => seatOccupancy[id].push(res));
+                await strapi.documents('api::reservation.reservation').update({
+                    documentId: res.documentId,
+                    data: { assignedTables: assignedIds }
+                });
+                await strapi.documents('api::reservation.reservation').publish({
+                    documentId: res.documentId
+                });
+                migratedCount++;
+                migrationLog.push(`Res ${res.id} (${res.name}, ${guests}p) -> ${assignedIds.length} seats`);
+            } else {
+                migrationLog.push(`Res ${res.id} (${res.name}, ${guests}p) -> FAILED. Needs manual fix.`);
+            }
+        }
+
+        return ctx.send({
+            success: true,
+            message: `Created 10 Counter Seats (Cap 1). Migrated ${migratedCount}/${reservations.length}. Archived ${oldTables.length} tables.`,
+            log: migrationLog
+        });
+
+    } catch (err) {
+        console.error('Migration Failed:', err);
+        return ctx.send({
+            success: false,
+            error: err instanceof Error ? err.message : String(err),
+            stack: err instanceof Error ? err.stack : undefined
+        });
+    }
+},
 };
