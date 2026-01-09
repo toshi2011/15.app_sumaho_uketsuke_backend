@@ -23,4 +23,6 @@ export default factories.createCoreController('api::store.store', ({ strapi }) =
             ctx.throw(500, error);
         }
     },
+
+
 }));
