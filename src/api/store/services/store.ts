@@ -1,18 +1,20 @@
-// Force Rebuild Timestamp
+// Force Rebuild Timestamp: Refactor 2026-01-14 Fix Lint
 import { factories } from '@strapi/strapi';
 import { timeToMinutes, normalizeBusinessHours } from '../../../utils/timeUtils';
-// import * as fs from 'fs';
-// import * as path from 'path';
+import { StoreConfig } from '../../../core/config/StoreConfig';
 
 const log = (message: string) => {
     try {
-        // const logPath = path.join(process.cwd(), 'debug_log.txt');
-        // const timestamp = new Date().toISOString();
-        // fs.appendFileSync(logPath, `[${timestamp}] ${message}\n`);
         strapi.log.debug(`[StoreService] ${message}`);
     } catch (e) {
         // ignore
     }
+};
+
+const formatMin = (min: number) => {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 };
 
 export default factories.createCoreService('api::store.store', ({ strapi }) => ({
@@ -37,114 +39,64 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
             }
 
             console.log(`[DEBUG] checkAvailability (TableLogic): storeId=${storeId}, date=${date}, time=${time}, guests=${guests}`);
-            // Log locale
-            console.log(`[DEBUG] Store Locale: ${(store as any).locale}`);
 
-            const maxCapacity = store.maxCapacity ?? 20; // Global fallback
-            const maxGroupsPerSlot = store.maxGroupsPerSlot ?? 5; // Global fallback
+            // === USE CENTRALIZED CONFIG ===
+            const config = StoreConfig.resolve(store);
 
-            // ... Time Logic (reuse existing) ...
-            const bh: any = (store as any).businessHours || {};
-            const lunchStartStr = bh.lunch?.start || "11:00";
-            const lunchEndStr = bh.lunch?.end || store.lunchEndTime || "15:00";
-            const dinnerStartStr = bh.dinner?.start || "17:00";
-            const dinnerEndStr = bh.dinner?.end || "23:00";
-
-            // 【仕様変更】
-            // UI設定項目削除に伴い、バッファ時間は強制的に0として扱います。
-            // 店主は平均滞在時間に片付け時間を含めて設定することが推奨されます。
-            const lunchCleanUp = 0;
-            const dinnerCleanUp = 0;
-
-            // Durations
-            const lunchDuration = store.lunchDuration ?? 90;
-            const dinnerDuration = store.dinnerDuration ?? 120;
-            const maxDurationLimit = store.maxDurationLimit ?? 180;
-
-            // Integer Conversion
-            const lunchStartMin = timeToMinutes(lunchStartStr);
-
-            // Use lastOrder if available
-            const lunchLastOrderStr = bh.lunch?.lastOrder;
-            const lunchEndMin = normalizeBusinessHours(lunchStartMin, timeToMinutes(lunchEndStr));
-
-            let lunchLastOrderMin = lunchEndMin;
-            if (lunchLastOrderStr) {
-                lunchLastOrderMin = normalizeBusinessHours(lunchStartMin, timeToMinutes(lunchLastOrderStr));
-            }
-
-            const dinnerStartMin = timeToMinutes(dinnerStartStr);
-            let dinnerEndMin = timeToMinutes(dinnerEndStr);
-            dinnerEndMin = normalizeBusinessHours(dinnerStartMin, dinnerEndMin);
-
-            let targetStartMin = timeToMinutes(time);
-            if (dinnerEndMin > 1440 && targetStartMin < lunchStartMin) {
-                targetStartMin += 1440;
+            const targetStartMin = timeToMinutes(time);
+            let adjustedTargetStart = targetStartMin;
+            // Handle late night boundary if needed
+            if (config.dinnerEndMin > 1440 && targetStartMin < config.lunchStartMin) {
+                adjustedTargetStart += 1440;
             }
 
             let isLunch = false;
-            let currentCleanUp = 0;
             let currentBaseDuration = 90;
+            let closingMin = 0;
 
             // Rule B: Range Classification & Gap Check
-            if (targetStartMin >= lunchStartMin && targetStartMin < lunchEndMin) {
+            if (adjustedTargetStart >= config.lunchStartMin && adjustedTargetStart < config.lunchEndMin) {
                 isLunch = true;
-                currentCleanUp = lunchCleanUp;
-                currentBaseDuration = lunchDuration;
-            } else if (targetStartMin >= dinnerStartMin && targetStartMin < dinnerEndMin) {
+                currentBaseDuration = config.lunchDuration;
+                closingMin = config.lunchEndMin;
+            } else if (adjustedTargetStart >= config.dinnerStartMin && adjustedTargetStart < config.dinnerEndMin) {
                 isLunch = false;
-                currentCleanUp = dinnerCleanUp;
-                currentBaseDuration = dinnerDuration;
+                currentBaseDuration = config.dinnerDuration;
+                closingMin = config.dinnerEndMin;
             } else {
                 return {
                     available: false,
                     capacityUsed: 0,
                     requiredDuration: 0,
-                    reason: `Outside of business hours. Lunch: ${lunchStartStr}~${lunchEndStr}, Dinner: ${dinnerStartStr}~${dinnerEndStr}`,
+                    reason: `Outside of business hours. Lunch: ${formatMin(config.lunchStartMin)}~${formatMin(config.lunchEndMin)}, Dinner: ${formatMin(config.dinnerStartMin)}~${formatMin(config.dinnerEndMin)}`,
                     action: 'reject'
                 };
             }
 
             // Duration Calculation
-            // Duration Calculation
-            // 【仕様変更】人数による自動延長機能（dynamicDurationRate）を廃止
-            // 常に店舗設定のランチ/ディナー滞在時間を適用する
-            let requiredDuration = Math.min(currentBaseDuration, maxDurationLimit);
+            let requiredDuration = Math.min(currentBaseDuration, config.maxDuration);
 
-            const targetEndMin = targetStartMin + requiredDuration;
-            const targetEndWithBuffer = targetEndMin + currentCleanUp;
+            const targetEndMin = adjustedTargetStart + requiredDuration;
+            const targetEndWithBuffer = targetEndMin + config.cleanupDuration;
 
-            // 【仕様変更】
-            // 閉店ルールはランチとディナーで異なります。
-            // ランチ: ラストオーダー方式 (終了時間の15分前までに入店すればOK)
-            // ディナー: 厳格な閉店時間 (退店時間が閉店時間を超えてはいけない)
             // Rule C: Closing Time Constraint
-
-            let closingMin = isLunch ? lunchEndMin : dinnerEndMin;
-
             if (isLunch) {
                 // Lunch: Last Order Logic
-                // Allow if start time is <= LO - 15 min
-                // lunchLastOrderMin is either proper LO time or End time if LO not set.
+                const lastOrderLimit = closingMin - config.lastOrderOffset;
 
-                const lastOrderLimit = lunchLastOrderMin - 15;
-
-                if (targetStartMin > lastOrderLimit) {
-                    // Determine string to show for LO
-                    const loTimeStr = lunchLastOrderStr || lunchEndStr;
+                if (adjustedTargetStart > lastOrderLimit) {
                     return {
                         available: false,
                         capacityUsed: 0,
                         requiredDuration,
-                        reason: `Lunch Last Order exceeded. LO is 15 min before ${loTimeStr}. Max start: ${lastOrderLimit} min. Target: ${targetStartMin}`,
+                        reason: `Lunch Last Order exceeded. Max start: ${formatMin(lastOrderLimit)}. Target: ${time}`,
                         action: 'reject'
                     };
                 }
-                // For Lunch, we DO NOT check if targetEndWithBuffer > closingMin.
             } else {
                 // Dinner: Strict Closing Logic
                 if (targetEndWithBuffer > closingMin) {
-                    const maxPossible = closingMin - targetStartMin - currentCleanUp;
+                    const maxPossible = closingMin - adjustedTargetStart - config.cleanupDuration;
                     return {
                         available: false,
                         capacityUsed: 0,
@@ -171,20 +123,22 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
                 let resStart = timeToMinutes(res.time);
                 if (resStart === -1) return false;
 
-                if (dinnerEndMin > 1440 && resStart < lunchStartMin) resStart += 1440;
+                if (config.dinnerEndMin > 1440 && resStart < config.lunchStartMin) resStart += 1440;
 
-                // Infer duration for existing res (since we don't store it)
-                let rIsLunch = (resStart >= lunchStartMin && resStart < lunchEndMin);
-                let rBase = rIsLunch ? lunchDuration : dinnerDuration;
-                let rCleanUp = rIsLunch ? lunchCleanUp : dinnerCleanUp;
+                // Infer duration for existing res (using same logic as target)
+                let rIsLunch = (resStart >= config.lunchStartMin && resStart < config.lunchEndMin);
+                let rBase = rIsLunch ? config.lunchDuration : config.dinnerDuration;
 
-                // 【仕様変更】既存予約の所要時間計算も一律設定を適用
-                const rDuration = Math.min(rBase, maxDurationLimit);
+                // Use stored duration if available (preferred), else use config default
+                const storedDuration = (res as any).duration;
+                const rDuration = Math.min(storedDuration || rBase, config.maxDuration);
 
+                // Assuming cleanup is 0 as per config, but if we had it, we'd add it here
                 const resEnd = resStart + rDuration;
-                const theirEnd = resEnd + rCleanUp;
-                const myStart = targetStartMin;
-                const myEnd = targetEndWithBuffer; // already includes cleanup
+                const theirEnd = resEnd + config.cleanupDuration;
+
+                const myStart = adjustedTargetStart;
+                const myEnd = targetEndWithBuffer;
 
                 // Overlap: My Start < Their End AND Their Start < My End
                 return (myStart < theirEnd) && (resStart < myEnd);
@@ -240,14 +194,26 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
                 // 1. 連番（Sequential）チェック
                 for (let i = 0; i <= counterSeats.length - guests; i++) {
                     const block = counterSeats.slice(i, i + guests);
-                    // block内の席が本当に連番か確認（sortOrderが連続しているか）
-                    // データ不整合でsortOrderが飛んでいる場合もあるので、厳密にするならここでチェック
-                    // 今回は単純にリスト上の並びで判断（「空いている席」の並びなので、物理的に隣とは限らないが...
-                    // 修正: これだと「C1, C3」が空いている時に連番とみなされる。
-                    // 物理的な連番チェックにはSortOrderの差を見る必要がある。
+
                     const isSequential = block.every((t: any, idx: number) => {
                         if (idx === 0) return true;
-                        return (t.sortOrder - block[idx - 1].sortOrder) === 1;
+                        const prev = block[idx - 1];
+
+                        // 1. Try SortOrder
+                        if (t.sortOrder && prev.sortOrder) {
+                            if (t.sortOrder - prev.sortOrder === 1) return true;
+                        }
+
+                        // 2. Fallback: Name-based check (e.g. "Counter-1", "Counter-2")
+                        const nameMatch = t.name.match(/(\d+)$/);
+                        const prevMatch = prev.name.match(/(\d+)$/);
+                        if (nameMatch && prevMatch) {
+                            const num = parseInt(nameMatch[1], 10);
+                            const prevNum = parseInt(prevMatch[1], 10);
+                            if (num - prevNum === 1) return true;
+                        }
+
+                        return false;
                     });
 
                     if (isSequential) {

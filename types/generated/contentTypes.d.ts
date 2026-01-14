@@ -895,6 +895,7 @@ export interface ApiTableTable extends Struct.CollectionTypeSchema {
       'manyToMany',
       'api::reservation.reservation'
     >;
+    sortOrder: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<100>;
     store: Schema.Attribute.Relation<'manyToOne', 'api::store.store'>;
     type: Schema.Attribute.Enumeration<['counter', 'table', 'private']> &
       Schema.Attribute.Required &

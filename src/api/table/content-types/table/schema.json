@@ -25,6 +25,10 @@
             "type": "integer",
             "min": 1
         },
+        "sortOrder": {
+            "type": "integer",
+            "default": 100
+        },
         "description": {
             "type": "text"
         },

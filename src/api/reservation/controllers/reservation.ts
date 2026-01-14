@@ -1,4 +1,5 @@
 import { factories } from '@strapi/strapi';
+import { StoreConfig } from '../../../core/config/StoreConfig';
 
 export default factories.createCoreController('api::reservation.reservation', ({ strapi }) => ({
     async create(ctx) {
@@ -94,5 +95,56 @@ export default factories.createCoreController('api::reservation.reservation', ({
             // Pass to default error handler or throw
             throw error;
         }
+    },
+
+    async find(ctx) {
+        const { data, meta } = await super.find(ctx);
+
+        // Enrich with default duration if missing
+        if (data) {
+            data.forEach((res: any) => {
+                const attrs = res.attributes || res; // attributes for REST, res for internal? Verify
+                if (!attrs.duration) {
+                    // Try to resolve from store if populated
+                    let duration = 90; // Fallback System Default
+
+                    if (attrs.store && attrs.store.data) {
+                        const storeData = attrs.store.data.attributes || attrs.store.data;
+                        const config = StoreConfig.resolve(storeData);
+                        // Determine if lunch or dinner
+                        const time = attrs.time;
+                        if (time && StoreConfig.isLunch(time, config)) {
+                            duration = config.lunchDuration;
+                        } else {
+                            duration = config.dinnerDuration;
+                        }
+                    }
+                    attrs.duration = duration;
+                }
+            });
+        }
+        return { data, meta };
+    },
+
+    async findOne(ctx) {
+        const { data, meta } = await super.findOne(ctx);
+
+        if (data) {
+            const attrs = data.attributes || data;
+            if (!attrs.duration) {
+                let duration = 90;
+                if (attrs.store && attrs.store.data) {
+                    const storeData = attrs.store.data.attributes || attrs.store.data;
+                    const config = StoreConfig.resolve(storeData);
+                    if (attrs.time && StoreConfig.isLunch(attrs.time, config)) {
+                        duration = config.lunchDuration;
+                    } else {
+                        duration = config.dinnerDuration;
+                    }
+                }
+                attrs.duration = duration;
+            }
+        }
+        return { data, meta };
     }
 }));
