@@ -70,6 +70,7 @@ $RECYCLE.BIN/
 *.sql
 *.sqlite
 *.sqlite3
+*.txt
 
 
 ############################
@@ -144,4 +145,10 @@ note/.obsidian/
 note/issue_watcher.py
 backend/note/issues/起票済/
 pg_marge3.bat
+
+############################
+# Scripts
+############################
+scripts/*.js
+
 

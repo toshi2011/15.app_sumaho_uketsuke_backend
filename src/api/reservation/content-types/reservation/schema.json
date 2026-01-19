@@ -100,6 +100,16 @@
             "relation": "manyToMany",
             "target": "api::table.table",
             "inversedBy": "reservations"
+        },
+        "endTime": {
+            "type": "time"
+        },
+        "laneIndex": {
+            "type": "integer"
+        },
+        "isOvernight": {
+            "type": "boolean",
+            "default": false
         }
     }
 }

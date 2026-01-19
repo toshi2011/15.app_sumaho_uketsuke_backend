@@ -80,6 +80,11 @@ export default {
                         );
                     }
 
+                    // DEBUG: Log duration for specific user to trace 0px issue
+                    // if (r.name && r.name.includes('山')) {
+                    //    console.log(`[OwnerRes] Mapping ${r.name} (DocID: ${r.documentId}): Duration=${r.duration} (${typeof r.duration}) / Lane=${r.laneIndex}`);
+                    // }
+
                     return {
                         id: r.id, // Numeric ID
                         documentId: r.documentId, // Document ID
@@ -90,6 +95,7 @@ export default {
                         date: r.date,
                         time: r.time,
                         duration: r.duration,
+                        laneIndex: r.laneIndex, // Ticket-03: Ensure laneIndex is returned
                         guests: r.guests,
                         status: r.status,
                         course: r.course,
@@ -166,6 +172,7 @@ export default {
                     date: reservation.date,
                     time: reservation.time,
                     duration: reservation.duration,
+                    laneIndex: reservation.laneIndex,
                     guests: reservation.guests,
                     status: reservation.status,
                     course: reservation.course,
@@ -559,149 +566,149 @@ export default {
         }
     },
     async fixCounters(ctx) {
-    let storeId = ctx.request.header['x-store-id'];
-    if (!storeId) return ctx.badRequest('No Store ID');
+        let storeId = ctx.request.header['x-store-id'];
+        if (!storeId) return ctx.badRequest('No Store ID');
 
-    try {
-        // Validate/Resolve Store ID
-        if (!isNaN(Number(storeId))) {
-            const store = await strapi.db.query('api::store.store').findOne({ where: { id: storeId } });
-            if (store) storeId = store.documentId;
-        }
-
-        // Cleanup: Archive ANY existing Active table with "カウンター" in name
-        const oldTables = await strapi.documents('api::table.table').findMany({
-            filters: {
-                store: { documentId: storeId },
-                name: { $contains: 'カウンター' },
-                isActive: true
+        try {
+            // Validate/Resolve Store ID
+            if (!isNaN(Number(storeId))) {
+                const store = await strapi.db.query('api::store.store').findOne({ where: { id: storeId } });
+                if (store) storeId = store.documentId;
             }
-        });
 
-        console.log(`[Migration] Archiving ${oldTables.length} existing counter tables...`);
-        for (const t of oldTables) {
-            await strapi.documents('api::table.table').update({
-                documentId: t.documentId,
-                data: {
-                    name: `(Archived) ${t.name}`,
-                    isActive: false
+            // Cleanup: Archive ANY existing Active table with "カウンター" in name
+            const oldTables = await strapi.documents('api::table.table').findMany({
+                filters: {
+                    store: { documentId: storeId },
+                    name: { $contains: 'カウンター' },
+                    isActive: true
                 }
             });
-        }
 
-        // Create 10 New Counter Tables (Cap 1)
-        const newTables = [];
-        for (let i = 1; i <= 10; i++) {
-            const newT = await strapi.documents('api::table.table').create({
-                data: {
-                    name: `カウンター${i}`,
-                    capacity: 1,
-                    maxCapacity: 1,
-                    baseCapacity: 1,
-                    isActive: true,
-                    type: 'counter',
-                    store: storeId,
-                    sortOrder: i
-                } as any,
-                status: 'published'
+            console.log(`[Migration] Archiving ${oldTables.length} existing counter tables...`);
+            for (const t of oldTables) {
+                await strapi.documents('api::table.table').update({
+                    documentId: t.documentId,
+                    data: {
+                        name: `(Archived) ${t.name}`,
+                        isActive: false
+                    }
+                });
+            }
+
+            // Create 10 New Counter Tables (Cap 1)
+            const newTables = [];
+            for (let i = 1; i <= 10; i++) {
+                const newT = await strapi.documents('api::table.table').create({
+                    data: {
+                        name: `カウンター${i}`,
+                        capacity: 1,
+                        maxCapacity: 1,
+                        baseCapacity: 1,
+                        isActive: true,
+                        type: 'counter',
+                        store: storeId,
+                        sortOrder: i
+                    } as any,
+                    status: 'published'
+                });
+                newTables.push(newT);
+            }
+
+            // Migrate Existing Reservations
+            const archivedIds = oldTables.map((t: any) => t.documentId);
+            const reservations = await strapi.documents('api::reservation.reservation').findMany({
+                filters: {
+                    store: { documentId: storeId },
+                    assignedTables: { documentId: { $in: archivedIds } },
+                    status: { $ne: 'canceled' },
+                },
+                populate: ['assignedTables']
             });
-            newTables.push(newT);
-        }
 
-        // Migrate Existing Reservations
-        const archivedIds = oldTables.map((t: any) => t.documentId);
-        const reservations = await strapi.documents('api::reservation.reservation').findMany({
-            filters: {
-                store: { documentId: storeId },
-                assignedTables: { documentId: { $in: archivedIds } },
-                status: { $ne: 'canceled' },
-            },
-            populate: ['assignedTables']
-        });
+            console.log(`[Migration] Found ${reservations.length} reservations to migrate.`);
 
-        console.log(`[Migration] Found ${reservations.length} reservations to migrate.`);
+            let migratedCount = 0;
+            const migrationLog = [];
 
-        let migratedCount = 0;
-        const migrationLog = [];
+            // Simple In-Memory State for Overlap Check
+            const seatOccupancy: Record<string, any[]> = {};
+            newTables.forEach((t: any) => seatOccupancy[t.documentId] = []);
 
-        // Simple In-Memory State for Overlap Check
-        const seatOccupancy: Record<string, any[]> = {};
-        newTables.forEach((t: any) => seatOccupancy[t.documentId] = []);
+            const checkOverlap = (existingRes: any, newRes: any) => {
+                try {
+                    const partsA = existingRes.time.split(':');
+                    const startA = parseInt(partsA[0]) * 60 + parseInt(partsA[1]);
+                    const endA = startA + (existingRes.duration || 90);
 
-        const checkOverlap = (existingRes: any, newRes: any) => {
-            try {
-                const partsA = existingRes.time.split(':');
-                const startA = parseInt(partsA[0]) * 60 + parseInt(partsA[1]);
-                const endA = startA + (existingRes.duration || 90);
+                    const partsB = newRes.time.split(':');
+                    const startB = parseInt(partsB[0]) * 60 + parseInt(partsB[1]);
+                    const endB = startB + (newRes.duration || 90);
 
-                const partsB = newRes.time.split(':');
-                const startB = parseInt(partsB[0]) * 60 + parseInt(partsB[1]);
-                const endB = startB + (newRes.duration || 90);
+                    if (existingRes.date !== newRes.date) return false;
+                    return (startA < endB) && (startB < endA);
+                } catch { return true; }
+            };
 
-                if (existingRes.date !== newRes.date) return false;
-                return (startA < endB) && (startB < endA);
-            } catch { return true; }
-        };
+            for (const res of reservations) {
+                const guests = res.guests || 2;
+                let assignedIds: string[] = [];
+                let found = false;
 
-        for (const res of reservations) {
-            const guests = res.guests || 2;
-            let assignedIds: string[] = [];
-            let found = false;
+                // 1. Try Sequential Blocks (BEST FIT logic)
+                for (let i = 0; i <= newTables.length - guests; i++) {
+                    const block = newTables.slice(i, i + guests);
+                    const isBlockFree = block.every((table: any) => {
+                        return !seatOccupancy[table.documentId].some((existing: any) => checkOverlap(existing, res));
+                    });
 
-            // 1. Try Sequential Blocks (BEST FIT logic)
-            for (let i = 0; i <= newTables.length - guests; i++) {
-                const block = newTables.slice(i, i + guests);
-                const isBlockFree = block.every((table: any) => {
-                    return !seatOccupancy[table.documentId].some((existing: any) => checkOverlap(existing, res));
-                });
+                    if (isBlockFree) {
+                        assignedIds = block.map((t: any) => t.documentId);
+                        found = true;
+                        break;
+                    }
+                }
 
-                if (isBlockFree) {
-                    assignedIds = block.map((t: any) => t.documentId);
-                    found = true;
-                    break;
+                // 2. If not sequential, try Scattered
+                if (!found) {
+                    const freeTables = newTables.filter((table: any) => {
+                        return !seatOccupancy[table.documentId].some((existing: any) => checkOverlap(existing, res));
+                    });
+                    if (freeTables.length >= guests) {
+                        assignedIds = freeTables.slice(0, guests).map((t: any) => t.documentId);
+                        found = true;
+                    }
+                }
+
+                if (found) {
+                    assignedIds.forEach(id => seatOccupancy[id].push(res));
+                    await strapi.documents('api::reservation.reservation').update({
+                        documentId: res.documentId,
+                        data: { assignedTables: assignedIds }
+                    });
+                    await strapi.documents('api::reservation.reservation').publish({
+                        documentId: res.documentId
+                    });
+                    migratedCount++;
+                    migrationLog.push(`Res ${res.id} (${res.name}, ${guests}p) -> ${assignedIds.length} seats`);
+                } else {
+                    migrationLog.push(`Res ${res.id} (${res.name}, ${guests}p) -> FAILED. Needs manual fix.`);
                 }
             }
 
-            // 2. If not sequential, try Scattered
-            if (!found) {
-                const freeTables = newTables.filter((table: any) => {
-                    return !seatOccupancy[table.documentId].some((existing: any) => checkOverlap(existing, res));
-                });
-                if (freeTables.length >= guests) {
-                    assignedIds = freeTables.slice(0, guests).map((t: any) => t.documentId);
-                    found = true;
-                }
-            }
+            return ctx.send({
+                success: true,
+                message: `Created 10 Counter Seats (Cap 1). Migrated ${migratedCount}/${reservations.length}. Archived ${oldTables.length} tables.`,
+                log: migrationLog
+            });
 
-            if (found) {
-                assignedIds.forEach(id => seatOccupancy[id].push(res));
-                await strapi.documents('api::reservation.reservation').update({
-                    documentId: res.documentId,
-                    data: { assignedTables: assignedIds }
-                });
-                await strapi.documents('api::reservation.reservation').publish({
-                    documentId: res.documentId
-                });
-                migratedCount++;
-                migrationLog.push(`Res ${res.id} (${res.name}, ${guests}p) -> ${assignedIds.length} seats`);
-            } else {
-                migrationLog.push(`Res ${res.id} (${res.name}, ${guests}p) -> FAILED. Needs manual fix.`);
-            }
+        } catch (err) {
+            console.error('Migration Failed:', err);
+            return ctx.send({
+                success: false,
+                error: err instanceof Error ? err.message : String(err),
+                stack: err instanceof Error ? err.stack : undefined
+            });
         }
-
-        return ctx.send({
-            success: true,
-            message: `Created 10 Counter Seats (Cap 1). Migrated ${migratedCount}/${reservations.length}. Archived ${oldTables.length} tables.`,
-            log: migrationLog
-        });
-
-    } catch (err) {
-        console.error('Migration Failed:', err);
-        return ctx.send({
-            success: false,
-            error: err instanceof Error ? err.message : String(err),
-            stack: err instanceof Error ? err.stack : undefined
-        });
-    }
-},
+    },
 };

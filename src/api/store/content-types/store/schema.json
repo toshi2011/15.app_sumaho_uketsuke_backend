@@ -94,21 +94,17 @@
         },
         "lunchDuration": {
             "type": "integer",
-            "default": 90,
             "min": 30
         },
         "dinnerDuration": {
             "type": "integer",
-            "default": 120,
             "min": 30
         },
         "lunchEndTime": {
-            "type": "time",
-            "default": "15:00:00.000"
+            "type": "time"
         },
         "cleanUpDuration": {
             "type": "integer",
-            "default": 15,
             "min": 0
         },
         "lunchCleanUp": {
@@ -128,7 +124,6 @@
         },
         "maxDurationLimit": {
             "type": "integer",
-            "default": 180,
             "min": 30
         },
         "allowSameDayBooking": {

@@ -470,7 +470,7 @@ export interface AdminUser extends Struct.CollectionTypeSchema {
 export interface ApiCustomerCustomer extends Struct.CollectionTypeSchema {
   collectionName: 'customers';
   info: {
-    description: '\u9867\u5BA2\u30DE\u30B9\u30BF\uFF08CRM\u7528\uFF09';
+    description: '\u9867\u5BA2\u30DE\u30B9\u30BF\uFF08CRM\u7528\uFF09 ';
     displayName: 'Customer';
     pluralName: 'customers';
     singularName: 'customer';
@@ -516,7 +516,7 @@ export interface ApiCustomerCustomer extends Struct.CollectionTypeSchema {
 export interface ApiMenuItemMenuItem extends Struct.CollectionTypeSchema {
   collectionName: 'menu_items';
   info: {
-    description: '\u5E97\u8217\u306E\u30E1\u30CB\u30E5\u30FC\u9805\u76EE';
+    description: '\u5E97\u8217\u306E\u30E1\u30CB\u30E5\u30FC\u9805\u76EE ';
     displayName: 'Menu Item';
     pluralName: 'menu-items';
     singularName: 'menu-item';
@@ -607,6 +607,7 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
     date: Schema.Attribute.Date;
     duration: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<120>;
     email: Schema.Attribute.Email;
+    endTime: Schema.Attribute.Time;
     guests: Schema.Attribute.Integer &
       Schema.Attribute.Required &
       Schema.Attribute.SetMinMax<
@@ -615,7 +616,9 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
         },
         number
       >;
+    isOvernight: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     isRead: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    laneIndex: Schema.Attribute.Integer;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -714,8 +717,7 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
           min: 0;
         },
         number
-      > &
-      Schema.Attribute.DefaultTo<15>;
+      >;
     coverImage: Schema.Attribute.Media<'images'>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -745,8 +747,7 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
           min: 30;
         },
         number
-      > &
-      Schema.Attribute.DefaultTo<120>;
+      >;
     dynamicDurationRate: Schema.Attribute.Integer &
       Schema.Attribute.SetMinMax<
         {
@@ -773,10 +774,8 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
           min: 30;
         },
         number
-      > &
-      Schema.Attribute.DefaultTo<90>;
-    lunchEndTime: Schema.Attribute.Time &
-      Schema.Attribute.DefaultTo<'15:00:00.000'>;
+      >;
+    lunchEndTime: Schema.Attribute.Time;
     maxCapacity: Schema.Attribute.Integer &
       Schema.Attribute.SetMinMax<
         {
@@ -791,8 +790,7 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
           min: 30;
         },
         number
-      > &
-      Schema.Attribute.DefaultTo<180>;
+      >;
     maxGroupsPerSlot: Schema.Attribute.Integer &
       Schema.Attribute.SetMinMax<
         {

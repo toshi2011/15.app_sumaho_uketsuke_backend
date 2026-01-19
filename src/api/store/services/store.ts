@@ -18,30 +18,33 @@ const formatMin = (min: number) => {
 };
 
 export default factories.createCoreService('api::store.store', ({ strapi }) => ({
-    async checkAvailability(storeId, date, time, guests) {
+    async checkAvailability(storeDocumentId, date, time, guests) {
         try {
             // 1. Fetch store settings and tables
-            let store = await strapi.entityService.findOne('api::store.store', storeId, {
-                populate: ['tables']
+            // Ticket 01: Explicitly use documentId
+            let store = await strapi.entityService.findOne('api::store.store', storeDocumentId, {
+                populate: '*' // StoreConfig用の設定値を全て取得するため '*' に変更
             });
 
             if (!store) {
                 // Try DB query fallback if entityService fails (rare for valid ID)
                 store = await strapi.db.query('api::store.store').findOne({
-                    where: { documentId: storeId },
-                    populate: ['tables']
+                    where: { documentId: storeDocumentId },
+                    populate: true // DB Queryでは true で全リレーション・フィールド取得
                 });
             }
 
             if (!store) {
-                console.warn(`checkAvailability: Store not found for ID: ${storeId}`);
+                console.warn(`checkAvailability: Store not found for ID: ${storeDocumentId}`);
                 return { available: false, capacityUsed: 0, requiredDuration: 0, reason: 'Store not found', action: 'reject' };
             }
 
-            console.log(`[DEBUG] checkAvailability (TableLogic): storeId=${storeId}, date=${date}, time=${time}, guests=${guests}`);
+            console.log(`[DEBUG] checkAvailability (TableLogic): storeDocumentId=${storeDocumentId}, date=${date}, time=${time}, guests=${guests}`);
 
             // === USE CENTRALIZED CONFIG ===
+            // console.log(`[DEBUG] Raw Store Config Candidates: lunchDuration=${(store as any).lunchDuration}, dinnerDuration=${(store as any).dinnerDuration}`);
             const config = StoreConfig.resolve(store);
+            console.log(`[StoreService] Resolved Config for DocID ${storeDocumentId}: LunchDur=${config.lunchDuration}, DinnerDur=${config.dinnerDuration}, LunchStart=${formatMin(config.lunchStartMin)}`);
 
             const targetStartMin = timeToMinutes(time);
             let adjustedTargetStart = targetStartMin;
@@ -94,18 +97,31 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
                     };
                 }
             } else {
-                // Dinner: Strict Closing Logic
                 if (targetEndWithBuffer > closingMin) {
                     const maxPossible = closingMin - adjustedTargetStart - config.cleanupDuration;
                     return {
                         available: false,
                         capacityUsed: 0,
                         requiredDuration,
+                        endTime: null,
+                        isOvernight: false,
                         reason: `Exceeds closing time. Max duration available: ${maxPossible} min`,
                         action: 'reject'
                     };
                 }
             }
+
+            // Calculate EndTime/Overnight for valid response
+            let clockMin = targetEndMin;
+            let isOvernight = false;
+            if (clockMin >= 1440) {
+                clockMin -= 1440;
+                isOvernight = true;
+            }
+            const h = Math.floor(clockMin / 60);
+            const m = clockMin % 60;
+            // HH:mm format for frontend/logic usage (API uses HH:mm:ss.SSS for Time type)
+            const endTimeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 
             // 4. Rule A: Table Inventory Check
             // Fetch ALL reservations for this store on this date to check overlap
@@ -113,7 +129,7 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
                 filters: {
                     date: date,
                     status: { $ne: 'canceled' },
-                    store: store.id as any
+                    store: store.documentId as any // Cast to any to avoid strict type mismatch during build
                 },
                 populate: ['assignedTables']
             });
@@ -288,9 +304,11 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
                     available: true,
                     capacityUsed,
                     requiredDuration,
+                    endTime: endTimeStr,
+                    isOvernight,
                     action: 'proceed',
                     candidateTable: candidateTable,
-                    assignedTables: assignedTables, // 新規追加: 複数テーブル配列
+                    assignedTables: assignedTables,
                     storeLocale: (store as any).locale,
                     storeIdInt: (store as any).id,
                     bookingAcceptanceMode: (store as any).bookingAcceptanceMode

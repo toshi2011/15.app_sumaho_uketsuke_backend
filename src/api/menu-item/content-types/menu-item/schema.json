@@ -5,7 +5,7 @@
         "singularName": "menu-item",
         "pluralName": "menu-items",
         "displayName": "Menu Item",
-        "description": "店舗のメニュー項目"
+        "description": "店舗のメニュー項目 "
     },
     "options": {
         "draftAndPublish": true

@@ -46,11 +46,11 @@ module.exports = ({ env }) => {
     sqlite: {
       connection: {
         filename: (() => {
-          const dbPath = env('DATABASE_FILENAME', '.tmp/data.db');
-          // If absolute path, use it directly; otherwise, join with project root
-          return path.isAbsolute(dbPath)
-            ? dbPath
-            : path.join(__dirname, '..', '..', dbPath);
+          const pathVal = env('DATABASE_FILENAME', '.tmp/data.db');
+
+          return path.isAbsolute(pathVal)
+            ? pathVal
+            : path.join(__dirname, '..', '..', pathVal);
         })(),
       },
       useNullAsDefault: true,

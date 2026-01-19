@@ -1,0 +1,219 @@
+{
+  "timestamp": "2026-01-19T05:56:10.352Z",
+  "id": "v9qf6ofo35mr3kx1s4pthj8g",
+  "date": "2026-01-20",
+  "time": "18:00",
+  "guests": 2,
+  "storeFound": true,
+  "tablesRaw": [
+    {
+      "id": 42,
+      "documentId": "l8cn09q64avvnfmxs4qadgbu",
+      "name": "テーブル1",
+      "description": null,
+      "isActive": true,
+      "createdAt": "2026-01-19T05:40:40.196Z",
+      "updatedAt": "2026-01-19T05:40:40.196Z",
+      "publishedAt": "2026-01-19T05:40:40.180Z",
+      "locale": null,
+      "maxCapacity": 6,
+      "baseCapacity": 4,
+      "sortOrder": 100,
+      "type": "table"
+    },
+    {
+      "id": 43,
+      "documentId": "l30617nl3tyr2k3ii9nmhxvp",
+      "name": "テーブル2",
+      "description": null,
+      "isActive": true,
+      "createdAt": "2026-01-19T05:40:40.219Z",
+      "updatedAt": "2026-01-19T05:40:40.219Z",
+      "publishedAt": "2026-01-19T05:40:40.214Z",
+      "locale": null,
+      "maxCapacity": 6,
+      "baseCapacity": 4,
+      "sortOrder": 100,
+      "type": "table"
+    },
+    {
+      "id": 44,
+      "documentId": "lsuts5puyzpo0xoiaux23mnf",
+      "name": "テーブル3",
+      "description": null,
+      "isActive": true,
+      "createdAt": "2026-01-19T05:40:40.236Z",
+      "updatedAt": "2026-01-19T05:40:40.236Z",
+      "publishedAt": "2026-01-19T05:40:40.233Z",
+      "locale": null,
+      "maxCapacity": 4,
+      "baseCapacity": 2,
+      "sortOrder": 100,
+      "type": "table"
+    }
+  ],
+  "businessHours": {
+    "lunch": {
+      "start": "12:00:00.000",
+      "end": "14:00:00.000",
+      "lastOrder": "13:30:00.000",
+      "isEnabled": true
+    },
+    "dinner": {
+      "start": "18:00:00.000",
+      "end": "23:00:00.000",
+      "lastOrder": "22:00:00.000",
+      "isEnabled": true
+    },
+    "holidays": [
+      "Wed"
+    ],
+    "irregularHolidays": []
+  }
+},
+{
+  "timestamp": "2026-01-19T05:56:52.735Z",
+  "id": "v9qf6ofo35mr3kx1s4pthj8g",
+  "date": "2026-01-20",
+  "time": "18:00",
+  "guests": 2,
+  "storeFound": true,
+  "tablesRaw": [
+    {
+      "id": 42,
+      "documentId": "l8cn09q64avvnfmxs4qadgbu",
+      "name": "テーブル1",
+      "description": null,
+      "isActive": true,
+      "createdAt": "2026-01-19T05:40:40.196Z",
+      "updatedAt": "2026-01-19T05:40:40.196Z",
+      "publishedAt": "2026-01-19T05:40:40.180Z",
+      "locale": null,
+      "maxCapacity": 6,
+      "baseCapacity": 4,
+      "sortOrder": 100,
+      "type": "table"
+    },
+    {
+      "id": 43,
+      "documentId": "l30617nl3tyr2k3ii9nmhxvp",
+      "name": "テーブル2",
+      "description": null,
+      "isActive": true,
+      "createdAt": "2026-01-19T05:40:40.219Z",
+      "updatedAt": "2026-01-19T05:40:40.219Z",
+      "publishedAt": "2026-01-19T05:40:40.214Z",
+      "locale": null,
+      "maxCapacity": 6,
+      "baseCapacity": 4,
+      "sortOrder": 100,
+      "type": "table"
+    },
+    {
+      "id": 44,
+      "documentId": "lsuts5puyzpo0xoiaux23mnf",
+      "name": "テーブル3",
+      "description": null,
+      "isActive": true,
+      "createdAt": "2026-01-19T05:40:40.236Z",
+      "updatedAt": "2026-01-19T05:40:40.236Z",
+      "publishedAt": "2026-01-19T05:40:40.233Z",
+      "locale": null,
+      "maxCapacity": 4,
+      "baseCapacity": 2,
+      "sortOrder": 100,
+      "type": "table"
+    }
+  ],
+  "businessHours": {
+    "lunch": {
+      "start": "12:00:00.000",
+      "end": "14:00:00.000",
+      "lastOrder": "13:30:00.000",
+      "isEnabled": true
+    },
+    "dinner": {
+      "start": "18:00:00.000",
+      "end": "23:00:00.000",
+      "lastOrder": "22:00:00.000",
+      "isEnabled": true
+    },
+    "holidays": [
+      "Wed"
+    ],
+    "irregularHolidays": []
+  }
+},
+{
+  "timestamp": "2026-01-19T05:57:20.052Z",
+  "id": "v9qf6ofo35mr3kx1s4pthj8g",
+  "date": "2026-01-20",
+  "time": "12:00",
+  "guests": 2,
+  "storeFound": true,
+  "tablesRaw": [
+    {
+      "id": 42,
+      "documentId": "l8cn09q64avvnfmxs4qadgbu",
+      "name": "テーブル1",
+      "description": null,
+      "isActive": true,
+      "createdAt": "2026-01-19T05:40:40.196Z",
+      "updatedAt": "2026-01-19T05:40:40.196Z",
+      "publishedAt": "2026-01-19T05:40:40.180Z",
+      "locale": null,
+      "maxCapacity": 6,
+      "baseCapacity": 4,
+      "sortOrder": 100,
+      "type": "table"
+    },
+    {
+      "id": 43,
+      "documentId": "l30617nl3tyr2k3ii9nmhxvp",
+      "name": "テーブル2",
+      "description": null,
+      "isActive": true,
+      "createdAt": "2026-01-19T05:40:40.219Z",
+      "updatedAt": "2026-01-19T05:40:40.219Z",
+      "publishedAt": "2026-01-19T05:40:40.214Z",
+      "locale": null,
+      "maxCapacity": 6,
+      "baseCapacity": 4,
+      "sortOrder": 100,
+      "type": "table"
+    },
+    {
+      "id": 44,
+      "documentId": "lsuts5puyzpo0xoiaux23mnf",
+      "name": "テーブル3",
+      "description": null,
+      "isActive": true,
+      "createdAt": "2026-01-19T05:40:40.236Z",
+      "updatedAt": "2026-01-19T05:40:40.236Z",
+      "publishedAt": "2026-01-19T05:40:40.233Z",
+      "locale": null,
+      "maxCapacity": 4,
+      "baseCapacity": 2,
+      "sortOrder": 100,
+      "type": "table"
+    }
+  ],
+  "businessHours": {
+    "lunch": {
+      "start": "12:00:00.000",
+      "end": "14:00:00.000",
+      "lastOrder": "13:30:00.000",
+      "isEnabled": true
+    },
+    "dinner": {
+      "start": "18:00:00.000",
+      "end": "23:00:00.000",
+      "lastOrder": "22:00:00.000",
+      "isEnabled": true
+    },
+    "holidays": [
+      "Wed"
+    ],
+    "irregularHolidays": []
+  }
+},
