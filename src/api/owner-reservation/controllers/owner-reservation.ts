@@ -210,10 +210,67 @@ export default {
      * ステータス更新（メール送信トリガー）
      */
     async updateStatus(ctx) {
-        // ... (unchanged code) ...
         const { id } = ctx.params;
-        const { status, ownerReply, assignedTables } = ctx.request.body;
-        // ... (rest of updateStatus implementation)
+        const { status, ownerReply, assignedTables, cancelReason } = ctx.request.body;
+        const storeId = ctx.request.header['x-store-id'];
+
+        if (!storeId) {
+            return ctx.badRequest('X-Store-ID header is required');
+        }
+
+        try {
+            // 1. Validate Store & Reservation
+            const reservation = await strapi.db.query('api::reservation.reservation').findOne({
+                where: { documentId: id, store: { documentId: storeId } },
+            });
+
+            if (!reservation) {
+                return ctx.notFound('Reservation not found');
+            }
+
+            // 2. Prepare Update Data
+            const updateData: any = {
+                status,
+            };
+
+            if (ownerReply !== undefined) updateData.ownerReply = ownerReply;
+
+            // Handle logical cancellation
+            if (status === 'cancelled') {
+                updateData.cancelledAt = new Date();
+                if (cancelReason) updateData.cancelReason = cancelReason;
+                // Maybe free up tables? No, logical deletion keeps history.
+                // But availability check should ignore cancelled.
+            }
+
+            if (status === 'confirmed') {
+                updateData.confirmedAt = new Date();
+                updateData.isRead = true;
+            }
+
+            // 3. Update (Draft & Publish)
+            // Update Draft
+            await strapi.documents('api::reservation.reservation').update({
+                documentId: reservation.documentId,
+                data: updateData,
+            });
+
+            // Publish
+            const updated = await strapi.documents('api::reservation.reservation').publish({
+                documentId: reservation.documentId,
+            });
+
+            strapi.log.info(`[OwnerRes] Status updated for ${id}: ${status}`);
+
+            return ctx.body = {
+                success: true,
+                data: updated,
+            };
+
+        } catch (error) {
+            strapi.log.error('Reservation status update error:', error);
+            return ctx.internalServerError('Failed to update status');
+        }
     },
 
     /**
@@ -244,6 +301,11 @@ export default {
             const store = reservation.store;
             const newTime = time || reservation.time;
             const newGuests = guests || reservation.guests;
+            // Support updating duration (Ticket-Fix)
+            const newDuration = (ctx.request.body.duration !== undefined)
+                ? parseInt(ctx.request.body.duration)
+                : (reservation.duration || 90);
+
             let newAssignedTables = [];
 
             // テーブルID解決
@@ -268,6 +330,8 @@ export default {
             if (time) updateData.time = time;
             if (guests) updateData.guests = guests;
             if (assignedTables) updateData.assignedTables = newAssignedTables;
+            // Add duration to update data
+            if (ctx.request.body.duration !== undefined) updateData.duration = newDuration;
 
 
             // ==========================================
@@ -301,12 +365,8 @@ export default {
             const { timeToMinutes } = require('../../../utils/timeUtils');
             const startMin = timeToMinutes(checkTime);
 
-            // 所要時間（簡易計算またはストア設定から）
-            const storeAny = store as any;
-            const isLunch = startMin < 15 * 60; // 簡易判定
-            const duration = isLunch
-                ? (storeAny.lunchDuration || 90)
-                : (storeAny.dinnerDuration || 120);
+            // 所要時間（更新されたdurationを使用）
+            const duration = newDuration;
 
             const endMin = startMin + duration;
 
@@ -462,7 +522,9 @@ export default {
                     data: {
                         assignedTables: tablesForSource,
                         time: updateData.time || reservation.time,
-                        date: updateData.date || reservation.date
+                        date: updateData.date || reservation.date,
+                        guests: updateData.guests || reservation.guests,
+                        duration: updateData.duration || reservation.duration
                     },
                     populate: ['assignedTables']
                 });
