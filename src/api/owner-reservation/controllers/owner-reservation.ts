@@ -55,20 +55,18 @@ export default {
             const offset = (parseInt(page as string) - 1) * parseInt(pageSize as string);
             const limit = parseInt(pageSize as string);
 
-            // 予約を取得 (Use Document Service for Draft/Publish handling)
+            // 予約を取得
             const reservations = await strapi.documents('api::reservation.reservation').findMany({
                 filters: where,
                 sort: ['date:desc', 'time:asc'],
                 start: offset,
                 limit,
                 populate: ['assignedTables', 'customer'],
-                status: 'draft', // Fetch draft version to show latest "Modified" changes immediately
             });
 
             // 総件数を取得
             const total = await strapi.documents('api::reservation.reservation').count({
                 filters: where,
-                status: 'published',
             });
 
             // BE-104: 各予約に対してcustomerStatsを取得
@@ -251,16 +249,10 @@ export default {
                 updateData.isRead = true;
             }
 
-            // 3. Update (Draft & Publish)
-            // Update Draft
-            await strapi.documents('api::reservation.reservation').update({
+            // 3. Update
+            const updated = await strapi.documents('api::reservation.reservation').update({
                 documentId: reservation.documentId,
                 data: updateData,
-            });
-
-            // Publish
-            const updated = await strapi.documents('api::reservation.reservation').publish({
-                documentId: reservation.documentId,
             });
 
             strapi.log.info(`[OwnerRes] Status updated for ${id}: ${status}`);
@@ -464,23 +456,17 @@ export default {
                 // Remove id from updateData as update() uses documentId
                 const { id, ...dataToUpdate } = updateData;
 
-                // Update Draft first
-                const updatedDraft = await strapi.documents('api::reservation.reservation').update({
+                // Update
+                const updated = await strapi.documents('api::reservation.reservation').update({
                     documentId: reservation.documentId,
                     data: dataToUpdate,
                     populate: ['assignedTables'],
                 });
 
-                // Explicitly Publish
-                const published = await strapi.documents('api::reservation.reservation').publish({
-                    documentId: reservation.documentId,
-                    populate: ['assignedTables'],
-                });
-
                 strapi.log.info(`[Update Debug] Force update executed. DocID: ${reservation.documentId}`);
-                strapi.log.info(`[Update Debug] Published Reservation Assigned Tables: ${JSON.stringify((published as any).assignedTables ? (published as any).assignedTables.map((t: any) => t.name) : 'undefined')}`);
+                strapi.log.info(`[Update Debug] Updated Reservation Assigned Tables: ${JSON.stringify((updated as any).assignedTables ? (updated as any).assignedTables.map((t: any) => t.name) : 'undefined')}`);
 
-                return ctx.body = { success: true, data: published };
+                return ctx.body = { success: true, data: updated };
             }
 
             // ==========================================
@@ -519,7 +505,7 @@ export default {
                 const tablesForSource = newAssignedTables;
                 const tablesForTargetRes = reservation.assignedTables.map((t: any) => t.documentId);
 
-                // Update Source (Draft)
+                // Update Source
                 await strapi.documents('api::reservation.reservation').update({
                     documentId: reservation.documentId,
                     data: {
@@ -531,21 +517,13 @@ export default {
                     },
                     populate: ['assignedTables']
                 });
-                // Publish Source
-                await strapi.documents('api::reservation.reservation').publish({
-                    documentId: reservation.documentId,
-                });
 
-                // Update Target (Draft)
+                // Update Target
                 await strapi.documents('api::reservation.reservation').update({
                     documentId: targetRes.documentId,
                     data: {
                         assignedTables: tablesForTargetRes
                     },
-                });
-                // Publish Target
-                await strapi.documents('api::reservation.reservation').publish({
-                    documentId: targetRes.documentId,
                 });
 
                 strapi.log.info(`[Update Debug] Swapped. Source(${reservation.documentId})->${JSON.stringify(tablesForSource)}, Target(${targetRes.documentId})->${JSON.stringify(tablesForTargetRes)}`);
@@ -750,9 +728,6 @@ export default {
                     await strapi.documents('api::reservation.reservation').update({
                         documentId: res.documentId,
                         data: { assignedTables: assignedIds }
-                    });
-                    await strapi.documents('api::reservation.reservation').publish({
-                        documentId: res.documentId
                     });
                     migratedCount++;
                     migrationLog.push(`Res ${res.id} (${res.name}, ${guests}p) -> ${assignedIds.length} seats`);

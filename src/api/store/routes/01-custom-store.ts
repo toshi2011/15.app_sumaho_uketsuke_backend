@@ -10,7 +10,17 @@ export default {
                 middlewares: [],
             },
         },
+        {
+            method: 'GET',
+            path: '/stores/:id/available-slots',
+            handler: 'store.getAvailableSlots',
+            config: {
+                auth: false,
+                policies: [],
+                middlewares: [],
+            },
+        },
     ],
 };
 
-// Force reload timestamp: 2026-01-08-16-15
+// Force reload timestamp: 2026-01-21-18-30

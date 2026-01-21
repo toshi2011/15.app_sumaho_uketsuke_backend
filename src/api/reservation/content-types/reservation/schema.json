@@ -8,7 +8,7 @@
         "description": "予約情報"
     },
     "options": {
-        "draftAndPublish": true
+        "draftAndPublish": false
     },
     "pluginOptions": {},
     "attributes": {

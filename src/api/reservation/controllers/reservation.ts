@@ -1,5 +1,6 @@
 import { factories } from '@strapi/strapi';
 import { StoreConfig } from '../../../core/config/StoreConfig';
+import { StoreDomain } from '../../../core/domain/StoreDomain';
 import { timeToMinutes, minutesToTime } from '../../../utils/timeUtils'; // Need minutesToTime
 
 export default factories.createCoreController('api::reservation.reservation', ({ strapi }) => ({
@@ -70,12 +71,9 @@ export default factories.createCoreController('api::reservation.reservation', ({
 
                         console.log(`[Reservation] Manual Duration Resolution: TargetTime=${data.time}, LunchEnd=${config.lunchEndMin}, LunchDur=${config.lunchDuration}, DinnerDur=${config.dinnerDuration}`);
 
-                        if (timeToMinutes(data.time) < config.lunchEndMin) {
-                            data.duration = config.lunchDuration;
-                        } else {
-                            data.duration = config.dinnerDuration;
-                        }
-                        console.log(`[Reservation] Applied Duration: ${data.duration} min`);
+                        // === USE StoreDomain for duration calculation ===
+                        data.duration = StoreDomain.getDuration(data.time, config);
+                        console.log(`[Reservation] Applied Duration via StoreDomain: ${data.duration} min`);
                     }
 
                     const startMin = timeToMinutes(data.time);
@@ -105,6 +103,77 @@ export default factories.createCoreController('api::reservation.reservation', ({
 
                     // Initialize laneIndex? Let recalculate handle it.
                     data.laneIndex = 0;
+                }
+
+                // === PHASE 1: OVERLAP DOUBLE-CHECK (競合状態対策) ===
+                // トランザクション内で最終確認: INSERT直前に重複予約がないかチェック
+                // これにより "check → create" 間のギャップでの競合を検出
+                // 注意: カウンター席は複数予約が同時使用可能なので、競合チェック対象外
+                if (data.store && data.date && data.time && data.assignedTables && data.assignedTables.length > 0) {
+                    const startMin = timeToMinutes(data.time);
+                    const endMin = startMin + Number(data.duration || 90);
+
+                    // テーブル情報を取得して、カウンター席かどうかを判定
+                    const requestedTables = await strapi.db.query('api::table.table').findMany({
+                        where: {
+                            documentId: { $in: data.assignedTables }
+                        }
+                    });
+
+                    // 非カウンター席のみを競合チェック対象にする
+                    const nonCounterTableIds = requestedTables
+                        .filter((t: any) => t.type !== 'counter')
+                        .map((t: any) => t.documentId);
+
+                    // カウンター席のみの予約は競合チェックをスキップ
+                    if (nonCounterTableIds.length === 0) {
+                        strapi.log.info('[Reservation] Counter-only reservation, skipping overlap check');
+                    } else {
+                        // 同じ日・同じ店舗で予約を検索
+                        const conflictingReservations = await strapi.db.query('api::reservation.reservation').findMany({
+                            where: {
+                                date: data.date,
+                                status: { $ne: 'canceled' },
+                            },
+                            populate: ['assignedTables'],
+                        });
+
+                        const requestedTableIdSet = new Set(nonCounterTableIds);
+
+                        for (const existing of conflictingReservations) {
+                            // 既存予約のテーブル取得（非カウンターのみ）
+                            const existingTables = (existing as any).assignedTables || [];
+                            const existingNonCounterTableIds = existingTables
+                                .filter((t: any) => t.type !== 'counter')
+                                .map((t: any) => t.documentId);
+
+                            // 非カウンターテーブルの重複チェック
+                            const hasTableConflict = existingNonCounterTableIds.some((id: string) => requestedTableIdSet.has(id));
+                            if (!hasTableConflict) continue;
+
+                            // 時間の重複チェック
+                            const existingStartMin = timeToMinutes((existing as any).time);
+                            const existingEndMin = existingStartMin + Number((existing as any).duration || 90);
+
+                            if (StoreDomain.isTimeOverlap(startMin, endMin, existingStartMin, existingEndMin)) {
+                                // 競合検出！
+                                strapi.log.warn(`[Reservation] Overlap detected: 
+                                    New=${data.time}-${minutesToTime(endMin)}, 
+                                    Existing=${existing.time}-${minutesToTime(existingEndMin)}, 
+                                    Table=${existingNonCounterTableIds.join(',')}`);
+
+                                return ctx.conflict('Reservation conflict: Table already reserved for this time slot', {
+                                    reason: 'overlapping_reservation',
+                                    existingReservation: {
+                                        id: (existing as any).documentId,
+                                        time: (existing as any).time,
+                                        endTime: (existing as any).endTime,
+                                        name: (existing as any).name,
+                                    }
+                                });
+                            }
+                        }
+                    }
                 }
 
                 // 3. Create Entity (with Transaction)

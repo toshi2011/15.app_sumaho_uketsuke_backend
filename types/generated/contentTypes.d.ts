@@ -594,7 +594,7 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
     singularName: 'reservation';
   };
   options: {
-    draftAndPublish: true;
+    draftAndPublish: false;
   };
   attributes: {
     assignedTables: Schema.Attribute.Relation<'manyToMany', 'api::table.table'>;

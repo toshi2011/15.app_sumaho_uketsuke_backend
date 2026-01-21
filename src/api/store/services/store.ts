@@ -1,7 +1,8 @@
-// Force Rebuild Timestamp: Refactor 2026-01-14 Fix Lint
+// Force Rebuild Timestamp: Refactor 2026-01-21 StoreDomain Pattern
 import { factories } from '@strapi/strapi';
 import { timeToMinutes, normalizeBusinessHours } from '../../../utils/timeUtils';
 import { StoreConfig } from '../../../core/config/StoreConfig';
+import { StoreDomain, ResolvedTableConfig } from '../../../core/domain/StoreDomain';
 
 const log = (message: string) => {
     try {
@@ -186,16 +187,16 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
             const counterUsedSeats: Map<number, number> = new Map(); // For counter tables: tableId -> usedSeats
             let unassignedReservationCount = 0;
 
-            // Get active tables first for type checking
-            const tables = (store as any).tables || [];
-            const activeTables = tables.filter((t: any) => t.isActive);
+            // === USE StoreDomain for table normalization ===
+            const allTables = StoreDomain.resolveTables((store as any).tables);
+            const activeTables = allTables.filter(t => t.isActive);
 
             overlappingReservations.forEach(r => {
                 const res = r as any;
                 if (res.assignedTables && res.assignedTables.length > 0) {
                     res.assignedTables.forEach((t: any) => {
-                        // Check if this is a counter-type table
-                        const tableInStore = activeTables.find((st: any) => st.id === t.id);
+                        // Check if this is a counter-type table using normalized data
+                        const tableInStore = activeTables.find(st => st.id === t.id);
                         if (tableInStore && tableInStore.type === 'counter') {
                             // For counters, track used seats instead of marking entire table as used
                             const currentUsed = counterUsedSeats.get(t.id) || 0;
@@ -210,92 +211,47 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
                 }
             });
 
-            // Log counter seat usage
+            // Log counter seat usage (using normalized data)
             console.log(`[Counter] Seat usage:`, Array.from(counterUsedSeats.entries()).map(([id, used]) => {
-                const t = activeTables.find((x: any) => x.id === id);
-                return `${t?.name || id}: ${used}/${t?.maxCapacity || t?.capacity || 5}`;
+                const t = activeTables.find(x => x.id === id);
+                return `${t?.name || id}: ${used}/${t?.maxCapacity || 5}`;
             }).join(', ') || 'none');
 
-            // Available Tables = Store Tables - Used Tables (for non-counter)
-            // For counters, check remaining capacity
-            const availableTables = activeTables.filter((t: any) => {
-                if (t.type === 'counter') {
-                    // Counter: check if remaining capacity can fit guests
-                    const usedSeats = counterUsedSeats.get(t.id) || 0;
-                    const maxSeats = t.maxCapacity || t.capacity || 5;
-                    const remainingSeats = maxSeats - usedSeats;
-                    return remainingSeats >= guests;
-                } else {
-                    // Non-counter: check if not fully occupied
-                    return !usedTableIds.has(t.id);
-                }
-            });
+            // === USE StoreDomain for available table filtering ===
+            const availableTables = StoreDomain.getAvailableTables(
+                activeTables,
+                usedTableIds,
+                counterUsedSeats,
+                guests
+            );
 
-            console.log(`[DEBUG] Tables Total: ${tables.length}, Active: ${activeTables.length}, Used (non-counter): ${usedTableIds.size}, Counter tables with partial use: ${counterUsedSeats.size}, Available for ${guests} guests: ${availableTables.length}`);
+            console.log(`[DEBUG] Tables Total: ${allTables.length}, Active: ${activeTables.length}, Used (non-counter): ${usedTableIds.size}, Counter tables with partial use: ${counterUsedSeats.size}, Available for ${guests} guests: ${availableTables.length}`);
 
 
             const allowOverCapacity = (store as any).allowOverCapacity === true;
 
-            // ===== SIMPLIFIED SEAT ASSIGNMENT LOGIC (v2) =====
-            // Phase 1: Find tables that can accommodate guests (using maxCapacity as limit)
-            const fitTables = availableTables.filter((t: any) => {
-                const tMin = t.minCapacity || 1;
-                if (t.type === 'counter') {
-                    // Counter: remaining capacity is the limit
-                    const usedSeats = counterUsedSeats.get(t.id) || 0;
-                    const maxSeats = t.maxCapacity || t.capacity || 5;
-                    const remainingSeats = maxSeats - usedSeats;
-                    return guests >= tMin && guests <= remainingSeats;
-                } else {
-                    const tMax = t.maxCapacity || t.baseCapacity || t.capacity || 4;
-                    return guests >= tMin && guests <= tMax;
-                }
-            });
+            // ===== USE StoreDomain for seat assignment =====
+            // Phase 1: Find tables that can accommodate guests
+            const fitTables = StoreDomain.getFittingTables(
+                availableTables,
+                guests,
+                counterUsedSeats
+            );
 
             // Phase 2: Find tables where guests can fit but exceed baseCapacity (over-capacity)
-            const overCapacityTables = allowOverCapacity ? availableTables.filter((t: any) => {
-                const tMin = t.minCapacity || 1;
-                const tBase = t.baseCapacity || t.capacity || 4;
-                const tMax = t.maxCapacity || tBase;
-                // Already in fitTables (guests <= tMax), so check if guests > tBase
-                return guests >= tMin && guests <= tMax && guests > tBase;
+            const overCapacityTables = allowOverCapacity ? availableTables.filter(t => {
+                // Already using normalized data - no fallback needed
+                return guests >= t.minCapacity && guests <= t.maxCapacity && guests > t.baseCapacity;
             }) : [];
 
             console.log(`[SeatAssign] FitTables: ${fitTables.length}, OverCapacity: ${overCapacityTables.length}`);
 
-            // Phase 3: Resolve priority list
-            const guestsNum = Number(guests); // Ensure numeric comparison
+            // === USE StoreDomain for priority list ===
+            const guestsNum = Number(guests);
             const assignmentPriorities = (store as any).assignmentPriorities || {};
-            let priorityList: string[] = [];
-            let foundPriority = false;
+            const priorityList = StoreDomain.getPriorityList(guestsNum, assignmentPriorities);
 
-            console.log(`[SeatAssign] guests=${guests} (type: ${typeof guests}), guestsNum=${guestsNum}, assignmentPriorities keys: ${Object.keys(assignmentPriorities).join(',') || 'none'}`);
-
-            for (const key in assignmentPriorities) {
-                const setting = assignmentPriorities[key];
-                if (setting && setting.range && Array.isArray(setting.range) && setting.priority) {
-                    const [min, max] = setting.range;
-                    const cleanMax = max === null || max === undefined ? 999 : max;
-                    if (guestsNum >= min && guestsNum <= cleanMax) {
-                        priorityList = setting.priority;
-                        foundPriority = true;
-                        console.log(`[SeatAssign] Matched priority config '${key}': range=[${min},${cleanMax}], priority=${setting.priority.join(',')}`);
-                        break;
-                    }
-                }
-            }
-
-            if (!foundPriority) {
-                if (guestsNum <= 2) {
-                    priorityList = ['counter', 'table', 'private'];
-                } else if (guestsNum <= 4) {
-                    priorityList = ['table', 'private', 'counter'];
-                } else {
-                    priorityList = ['private', 'table'];
-                }
-            }
-
-            console.log(`[SeatAssign] PriorityList: ${priorityList.join(',')}`);
+            console.log(`[SeatAssign] guests=${guests}, priorityList=${priorityList.join(',')}`);
 
             // Phase 4: Find best match using staged fallback
             // Stage A: Priority type with exact/under capacity
@@ -303,32 +259,12 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
             // Stage C: Over-capacity (if allowed)
             // Stage D: Reject or call_store
 
-            let selectedTable: any = null;
+            let selectedTable: ResolvedTableConfig | null = null;
             let matchStage = '';
 
-            // Helper to get best fit from a list (smallest capacity that fits)
-            const getBestFit = (tables: any[], types?: string[]) => {
-                let filtered = tables;
-                if (types && types.length > 0) {
-                    filtered = tables.filter((t: any) => {
-                        const tType = t.type || 'table';
-                        return types.includes(tType);
-                    });
-                }
-                if (filtered.length === 0) return null;
-
-                // Sort by capacity (ascending) - prefer smallest that fits
-                filtered.sort((a: any, b: any) => {
-                    const capA = a.maxCapacity || a.baseCapacity || a.capacity || 4;
-                    const capB = b.maxCapacity || b.baseCapacity || b.capacity || 4;
-                    return capA - capB;
-                });
-                return filtered[0];
-            };
-
-            // Stage A: Priority types in fit tables
+            // Stage A: Priority types in fit tables (using StoreDomain.getBestFit)
             for (const pType of priorityList) {
-                const match = getBestFit(fitTables, [pType]);
+                const match = StoreDomain.getBestFit(fitTables, [pType]);
                 if (match) {
                     selectedTable = match;
                     matchStage = `A(${pType})`;
@@ -338,19 +274,20 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
 
             // Stage B: Any type in fit tables
             if (!selectedTable && fitTables.length > 0) {
-                selectedTable = getBestFit(fitTables);
+                selectedTable = StoreDomain.getBestFit(fitTables);
                 matchStage = 'B(any)';
             }
 
             // Stage C: Over-capacity tables
             if (!selectedTable && overCapacityTables.length > 0) {
-                selectedTable = getBestFit(overCapacityTables);
+                selectedTable = StoreDomain.getBestFit(overCapacityTables);
                 matchStage = 'C(over)';
             }
 
             // Phase 5: Return result
             if (selectedTable) {
-                const capacity = selectedTable.maxCapacity || selectedTable.baseCapacity || selectedTable.capacity || 4;
+                // Using normalized data - no fallback needed
+                const capacity = selectedTable.maxCapacity;
                 const bookingAcceptanceMode = (store as any).bookingAcceptanceMode || 'manual';
 
                 console.log(`[SeatAssign] Selected: ${selectedTable.name} (Stage ${matchStage}), DocID: ${selectedTable.documentId}, BookingMode: ${bookingAcceptanceMode}`);
