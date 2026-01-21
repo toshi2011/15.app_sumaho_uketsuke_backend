@@ -47,6 +47,13 @@
         "businessHours": {
             "type": "json"
         },
+        "assignmentPriorities": {
+            "type": "json"
+        },
+        "allowOverCapacity": {
+            "type": "boolean",
+            "default": false
+        },
         "snsLink1Label": {
             "type": "string"
         },

@@ -65,5 +65,16 @@ export default {
                 description: 'Migration: Fix Counters',
             },
         },
+        {
+            method: 'POST',
+            path: '/owner/reservations/recalc-lanes',
+            handler: 'owner-reservation.recalcLanes',
+            config: {
+                auth: false,
+                policies: [],
+                middlewares: [],
+                description: 'Force recalculate lane indices for a date',
+            },
+        },
     ],
 };

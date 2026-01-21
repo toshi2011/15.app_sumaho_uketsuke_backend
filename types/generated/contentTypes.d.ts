@@ -598,8 +598,6 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
   };
   attributes: {
     assignedTables: Schema.Attribute.Relation<'manyToMany', 'api::table.table'>;
-    cancelledAt: Schema.Attribute.DateTime;
-    cancelReason: Schema.Attribute.Text;
     confirmedAt: Schema.Attribute.DateTime;
     course: Schema.Attribute.String;
     createdAt: Schema.Attribute.DateTime;
@@ -630,7 +628,6 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
     name: Schema.Attribute.String & Schema.Attribute.Required;
     notes: Schema.Attribute.Text;
     ownerNote: Schema.Attribute.Text;
-    ownerReply: Schema.Attribute.Text;
     phone: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
     requiresReview: Schema.Attribute.Boolean &
@@ -641,7 +638,7 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.DefaultTo<'web'>;
     status: Schema.Attribute.Enumeration<
-      ['pending', 'confirmed', 'canceled', 'cancelled', 'completed']
+      ['pending', 'confirmed', 'canceled', 'completed']
     > &
       Schema.Attribute.DefaultTo<'pending'>;
     store: Schema.Attribute.Relation<'manyToOne', 'api::store.store'>;
@@ -702,8 +699,11 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
   attributes: {
     address: Schema.Attribute.String;
     adminToken: Schema.Attribute.String & Schema.Attribute.Private;
+    allowOverCapacity: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
     allowSameDayBooking: Schema.Attribute.Boolean &
       Schema.Attribute.DefaultTo<true>;
+    assignmentPriorities: Schema.Attribute.JSON;
     bookingAcceptanceMode: Schema.Attribute.Enumeration<
       ['auto', 'manual_if_notes', 'manual']
     > &
@@ -890,6 +890,14 @@ export interface ApiTableTable extends Struct.CollectionTypeSchema {
         },
         number
       >;
+    minCapacity: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 1;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<1>;
     name: Schema.Attribute.String & Schema.Attribute.Required;
     publishedAt: Schema.Attribute.DateTime;
     reservations: Schema.Attribute.Relation<

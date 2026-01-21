@@ -9,88 +9,141 @@ export default factories.createCoreService('api::reservation.reservation', ({ st
      * @param transaction Optional transaction object
      */
     async recalculateDailyLaneIndices(storeId: string | number, date: string, transaction?: any) {
-        // 1. Fetch all active reservations for the day, sorted by start time
-        // Note: We use strapi.db.query to support transaction and granular control
+        console.log(`[LaneCalc] Called with storeId=${storeId} (type: ${typeof storeId}), date=${date}`);
+
+        // 1. Fetch store to get table definitions
+        const store = await strapi.db.query('api::store.store').findOne({
+            where: typeof storeId === 'string' ? { documentId: storeId } : { id: storeId },
+            populate: ['tables']
+        });
+
+        if (!store) {
+            console.log(`[LaneCalc] Store not found!`);
+            return;
+        }
+
+        console.log(`[LaneCalc] Found store: ${(store as any).name}, tables: ${((store as any).tables || []).length}`);
+
+        const counterTableIds = new Set(
+            ((store as any).tables || [])
+                .filter((t: any) => t.type === 'counter' || t.name?.includes('カウンター'))
+                .map((t: any) => t.id)
+        );
+
+        console.log(`[LaneCalc] Counter table IDs: ${Array.from(counterTableIds).join(', ') || 'none'}`);
+
+        // 2. Fetch all active reservations for the day, sorted by start time
         const reservations = await strapi.db.query('api::reservation.reservation').findMany({
             where: {
-                store: storeId, // Works for both ID and DocumentID in Strapi 5 usually, but preferably DocumentID
+                store: typeof storeId === 'string' ? { documentId: storeId } : { id: storeId },
                 date: date,
                 status: { $ne: 'canceled' }
             },
-            orderBy: { time: 'asc' }, // Sort by start time strictly
-            populate: ['store'], // Ensure we might need config if re-calc duration? No, just lane here.
+            orderBy: { time: 'asc' },
+            populate: ['assignedTables'],
         });
 
-        if (!reservations || reservations.length === 0) return;
+        if (!reservations || reservations.length === 0) {
+            console.log(`[LaneCalc] No reservations found`);
+            return;
+        }
 
-        // 2. Greedy Algorithm for Lane Assignment
-        // lanes[i] holds the end time (in minutes) of the last reservation in lane i
-        const lanes: number[] = [];
+        // Deduplicate by documentId (draft and published versions have same documentId)
+        const seenDocIds = new Set<string>();
+        const uniqueReservations = reservations.filter((res: any) => {
+            if (seenDocIds.has(res.documentId)) {
+                return false;
+            }
+            seenDocIds.add(res.documentId);
+            return true;
+        });
 
-        // Prepare updates
+        console.log(`[LaneCalc] Found ${reservations.length} reservations (${uniqueReservations.length} unique)`);
+
+        // 3. Separate reservations into counter and table groups
+        const counterReservations: typeof reservations = [];
+        const tableReservations: typeof reservations = [];
+
+        uniqueReservations.forEach((res: any) => {
+            const assignedIds = res.assignedTables?.map((t: any) => t.id) || [];
+            const isCounter = res.assignedTables?.some((t: any) => counterTableIds.has(t.id));
+            console.log(`[LaneCalc] Res ${res.name}: assignedTables=${assignedIds.join(',')}, isCounter=${isCounter}`);
+            if (isCounter) {
+                counterReservations.push(res);
+            } else {
+                tableReservations.push(res);
+            }
+        });
+
+        console.log(`[LaneCalc] Store: ${storeId}, Date: ${date}, Total: ${uniqueReservations.length}, Counter: ${counterReservations.length}, Table: ${tableReservations.length}`);
+
+        // 4. Helper function for lane assignment
+        const assignLanes = (resGroup: typeof reservations): Map<string, number> => {
+            const lanes: number[] = [];
+            const assignments = new Map<string, number>();
+
+            for (const res of resGroup) {
+                const startMin = timeToMinutes(res.time);
+                const duration = res.duration || 90;
+                const endMin = startMin + duration;
+
+                let assignedLane = -1;
+                for (let i = 0; i < lanes.length; i++) {
+                    if (lanes[i] <= startMin) {
+                        assignedLane = i;
+                        lanes[i] = endMin;
+                        break;
+                    }
+                }
+
+                if (assignedLane === -1) {
+                    assignedLane = lanes.length;
+                    lanes.push(endMin);
+                }
+
+                assignments.set(res.documentId, assignedLane);
+            }
+
+            return assignments;
+        };
+
+        // 5. Calculate lanes separately for counter and table reservations
+        const counterLanes = assignLanes(counterReservations);
+        const tableLanes = assignLanes(tableReservations);
+
+        // 6. Prepare updates
         const updates = [];
 
-        for (const res of reservations) {
-            const startMin = timeToMinutes(res.time);
-            // duration and endTime should already be set by Controller, but be safe
-            // If missing, we might default, but Ticket 02 ensures they are present.
-            // We'll use stored endTime or calculate from duration.
-            // Let's rely on duration for simplicity of logic here, specifically 'end minute'.
-
-            let duration = res.duration || 90;
-            // If isOvernight, duration logic might separate, but for 'lane blocking',
-            // we cares about absolute minutes from start of the day (00:00).
-            // If start is 23:00 (1380) and duration 120, end is 1500 (25:00).
-
-            // Adjust start for overnight sorting if needed? 
-            // Actually, we assumed sorted by 'time' string ("00:00" to "23:59").
-            // If we have late night reservations (e.g. 26:00 represented as 02:00 next day?),
-            // usually they belong to the 'logical' date.
-            // If 'time' allows "26:00", that's fine. If "02:00", it might sort earlier.
-            // Assumption: 'date' represents the business day, and 'time' flows logically.
-            // If 'time' wraps (02:00 stored for next day), that reservation belongs to THAT date?
-            // User requirement says "Sort DB by start time".
-            // Let's assume 'time' is consistent 00:00-23:59.
-            // If valid reservation is 25:00, it's usually stored as 01:00 NEXT day?
-            // "日付を跨ぐ予約には isOvernight ... フロントエンドでの描画ミスを防ぐ"
-            // For lane logic, we just need checking overlaps.
-
-            let endMin = startMin + duration;
-
-            let assignedLane = -1;
-
-            // Find first lane that is free (Lane End Time <= Current Start Time)
-            for (let i = 0; i < lanes.length; i++) {
-                if (lanes[i] <= startMin) {
-                    assignedLane = i;
-                    lanes[i] = endMin; // Extend this lane
-                    break;
-                }
-            }
-
-            // If no suitable lane found, create new one
-            if (assignedLane === -1) {
-                assignedLane = lanes.length;
-                lanes.push(endMin);
-            }
-
-            // Determine if update is needed
-            if (res.laneIndex !== assignedLane) {
-                // Add to update promise list
+        for (const [docId, lane] of counterLanes) {
+            const res = counterReservations.find((r: any) => r.documentId === docId);
+            if (res && res.laneIndex !== lane) {
                 updates.push(
                     strapi.db.query('api::reservation.reservation').update({
-                        where: { documentId: res.documentId }, // Strapi 5 prefers documentId
-                        data: { laneIndex: assignedLane },
-                        transaction // Pass the transaction!
+                        where: { documentId: docId },
+                        data: { laneIndex: lane },
+                        transaction
                     } as any)
                 );
             }
         }
 
-        // 3. Execute all updates
+        for (const [docId, lane] of tableLanes) {
+            const res = tableReservations.find((r: any) => r.documentId === docId);
+            if (res && res.laneIndex !== lane) {
+                updates.push(
+                    strapi.db.query('api::reservation.reservation').update({
+                        where: { documentId: docId },
+                        data: { laneIndex: lane },
+                        transaction
+                    } as any)
+                );
+            }
+        }
+
+        // 7. Execute all updates
         if (updates.length > 0) {
             await Promise.all(updates);
-            // strapi.log.debug(`[ReservationService] Recalculated lanes for ${date}: ${updates.length} updates.`);
+            console.log(`[LaneCalc] Updated ${updates.length} reservations for ${date}`);
         }
     }
 }));

@@ -150,5 +150,7 @@ pg_marge3.bat
 # Scripts
 ############################
 scripts/*.js
+*.js
 
-
+doc/pg_marge_back.txt
+doc/pg_marge_back.txt

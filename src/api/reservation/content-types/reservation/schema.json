@@ -50,7 +50,6 @@
                 "pending",
                 "confirmed",
                 "canceled",
-                "cancelled",
                 "completed"
             ],
             "default": "pending"
@@ -111,15 +110,6 @@
         "isOvernight": {
             "type": "boolean",
             "default": false
-        },
-        "cancelledAt": {
-            "type": "datetime"
-        },
-        "cancelReason": {
-            "type": "text"
-        },
-        "ownerReply": {
-            "type": "text"
         }
     }
 }

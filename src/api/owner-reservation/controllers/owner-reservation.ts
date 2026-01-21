@@ -46,6 +46,9 @@ export default {
                 } else {
                     where.status = status;
                 }
+            } else {
+                // Default: exclude canceled reservations from timeline
+                where.status = { $ne: 'canceled' };
             }
 
             // ページネーション
@@ -236,8 +239,8 @@ export default {
             if (ownerReply !== undefined) updateData.ownerReply = ownerReply;
 
             // Handle logical cancellation
-            if (status === 'cancelled') {
-                updateData.cancelledAt = new Date();
+            if (status === 'canceled') {
+                updateData.canceledAt = new Date();
                 if (cancelReason) updateData.cancelReason = cancelReason;
                 // Maybe free up tables? No, logical deletion keeps history.
                 // But availability check should ignore cancelled.
@@ -378,7 +381,7 @@ export default {
                     store: { documentId: store.documentId }, // Try Document ID
                     date: checkDate,
                     id: { $ne: reservation.id },
-                    status: { $notIn: ['cancelled', 'no_show', 'completed'] },
+                    status: { $notIn: ['canceled', 'no_show', 'completed'] },
                     assignedTables: {
                         id: { $in: newAssignedTables }
                     }
@@ -770,6 +773,152 @@ export default {
                 success: false,
                 error: err instanceof Error ? err.message : String(err),
                 stack: err instanceof Error ? err.stack : undefined
+            });
+        }
+    },
+
+    /**
+     * POST /api/owner/reservations/recalc-lanes
+     * Force recalculate lane indices for a date
+     */
+    async recalcLanes(ctx) {
+        const storeId = ctx.request.header['x-store-id'];
+        const { date } = ctx.request.body;
+
+        if (!storeId) {
+            return ctx.badRequest('X-Store-ID header is required');
+        }
+
+        if (!date) {
+            return ctx.badRequest('date is required in body');
+        }
+
+        try {
+            // Get store tables to identify counters
+            const store = await strapi.db.query('api::store.store').findOne({
+                where: { documentId: storeId },
+                populate: ['tables']
+            });
+
+            if (!store) {
+                return ctx.notFound('Store not found');
+            }
+
+            const counterTableIds = new Set(
+                ((store as any).tables || [])
+                    .filter((t: any) => t.type === 'counter' || t.name?.includes('カウンター'))
+                    .map((t: any) => t.id)
+            );
+
+            // Get all reservations for the date
+            const reservations = await strapi.db.query('api::reservation.reservation').findMany({
+                where: {
+                    store: { documentId: storeId },
+                    date: date,
+                    status: { $ne: 'canceled' }
+                },
+                orderBy: { time: 'asc' },
+                populate: ['assignedTables']
+            });
+
+            if (!reservations || reservations.length === 0) {
+                return ctx.send({ success: true, message: 'No reservations found', updated: 0 });
+            }
+
+            // Separate counter and table reservations
+            const counterRes: any[] = [];
+            const tableRes: any[] = [];
+
+            reservations.forEach((res: any) => {
+                const isCounter = res.assignedTables?.some((t: any) => counterTableIds.has(t.id));
+                if (isCounter) {
+                    counterRes.push(res);
+                } else {
+                    tableRes.push(res);
+                }
+            });
+
+            console.log(`[RecalcLanes] Counter: ${counterRes.length}, Table: ${tableRes.length}`);
+
+            // Helper
+            const { timeToMinutes } = require('../../../utils/timeUtils');
+
+            const assignLanes = (resGroup: any[]): Map<string, number> => {
+                const lanes: number[] = [];
+                const assignments = new Map<string, number>();
+
+                for (const res of resGroup) {
+                    const startMin = timeToMinutes(res.time);
+                    const duration = res.duration || 90;
+                    const endMin = startMin + duration;
+
+                    let assignedLane = -1;
+                    for (let i = 0; i < lanes.length; i++) {
+                        if (lanes[i] <= startMin) {
+                            assignedLane = i;
+                            lanes[i] = endMin;
+                            break;
+                        }
+                    }
+
+                    if (assignedLane === -1) {
+                        assignedLane = lanes.length;
+                        lanes.push(endMin);
+                    }
+
+                    assignments.set(res.documentId, assignedLane);
+                }
+
+                return assignments;
+            };
+
+            const counterLanes = assignLanes(counterRes);
+            const tableLanes = assignLanes(tableRes);
+
+            console.log(`[RecalcLanes] Counter lanes:`, Array.from(counterLanes.entries()));
+            console.log(`[RecalcLanes] Table lanes:`, Array.from(tableLanes.entries()));
+
+            // Update using document service (updates draft)
+            let updated = 0;
+
+            for (const [docId, lane] of counterLanes) {
+                const res = counterRes.find((r: any) => r.documentId === docId);
+                if (res && res.laneIndex !== lane) {
+                    await strapi.documents('api::reservation.reservation').update({
+                        documentId: docId,
+                        data: { laneIndex: lane }
+                    });
+                    console.log(`[RecalcLanes] Updated ${res.name}: ${res.laneIndex} -> ${lane}`);
+                    updated++;
+                }
+            }
+
+            for (const [docId, lane] of tableLanes) {
+                const res = tableRes.find((r: any) => r.documentId === docId);
+                if (res && res.laneIndex !== lane) {
+                    await strapi.documents('api::reservation.reservation').update({
+                        documentId: docId,
+                        data: { laneIndex: lane }
+                    });
+                    console.log(`[RecalcLanes] Updated ${res.name}: ${res.laneIndex} -> ${lane}`);
+                    updated++;
+                }
+            }
+
+            return ctx.send({
+                success: true,
+                message: `Recalculated lanes for ${date}`,
+                total: reservations.length,
+                counter: counterRes.length,
+                table: tableRes.length,
+                updated
+            });
+
+        } catch (err) {
+            console.error('RecalcLanes Failed:', err);
+            return ctx.send({
+                success: false,
+                error: err instanceof Error ? err.message : String(err)
             });
         }
     },

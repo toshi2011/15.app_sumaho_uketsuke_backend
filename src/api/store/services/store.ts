@@ -44,7 +44,11 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
             // === USE CENTRALIZED CONFIG ===
             // console.log(`[DEBUG] Raw Store Config Candidates: lunchDuration=${(store as any).lunchDuration}, dinnerDuration=${(store as any).dinnerDuration}`);
             const config = StoreConfig.resolve(store);
-            console.log(`[StoreService] Resolved Config for DocID ${storeDocumentId}: LunchDur=${config.lunchDuration}, DinnerDur=${config.dinnerDuration}, LunchStart=${formatMin(config.lunchStartMin)}`);
+            console.log(`[StoreService] Resolved Config for DocID ${storeDocumentId}: LunchDur=${config.lunchDuration}, DinnerDur=${config.dinnerDuration}`);
+
+            if (!(store as any).tables) {
+                // warning or silent
+            }
 
             const targetStartMin = timeToMinutes(time);
             let adjustedTargetStart = targetStartMin;
@@ -124,15 +128,28 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
             const endTimeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 
             // 4. Rule A: Table Inventory Check
+            // Debug: First fetch ALL reservations for this date (no store filter) to see what exists
+            const debugAllRes = await strapi.entityService.findMany('api::reservation.reservation', {
+                filters: { date: date },
+                populate: ['assignedTables', 'store']
+            });
+            console.log(`[Overlap DEBUG] ALL reservations for ${date} (no store filter): ${debugAllRes.length}`);
+            debugAllRes.forEach((r: any) => {
+                console.log(`  - ID:${r.id}, time:${r.time}, store:${r.store?.documentId || 'NO STORE'}, status:${r.status}, tables:${r.assignedTables?.map((t: any) => t.name).join(',') || 'none'}`);
+            });
+
             // Fetch ALL reservations for this store on this date to check overlap
             const allReservations = await strapi.entityService.findMany('api::reservation.reservation', {
                 filters: {
                     date: date,
                     status: { $ne: 'canceled' },
-                    store: store.documentId as any // Cast to any to avoid strict type mismatch during build
+                    store: { documentId: store.documentId } as any // Proper relation filter format
                 },
                 populate: ['assignedTables']
             });
+
+            console.log(`[Overlap] Checking date=${date}, time=${time}, storeDocId=${store.documentId}, allReservations count=${allReservations.length}`);
+            console.log(`[Overlap] Target slot: start=${adjustedTargetStart}min (${time}), end=${targetEndWithBuffer}min`);
 
             // Identify overlapping reservations
             const overlappingReservations = allReservations.filter((res) => {
@@ -157,170 +174,213 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
                 const myEnd = targetEndWithBuffer;
 
                 // Overlap: My Start < Their End AND Their Start < My End
-                return (myStart < theirEnd) && (resStart < myEnd);
+                const overlaps = (myStart < theirEnd) && (resStart < myEnd);
+
+                console.log(`[Overlap] Res ID=${(res as any).id}, time=${res.time}, start=${resStart}min, end=${theirEnd}min, overlaps=${overlaps}, tables=${(res as any).assignedTables?.map((t: any) => t.name).join(',') || 'none'}`);
+
+                return overlaps;
             });
 
-            // Identify used tables (Reserved Tables)
-            const usedTableIds = new Set<number>();
+            // Identify used tables and counter seat usage
+            const usedTableIds = new Set<number>(); // For non-counter tables (fully occupied)
+            const counterUsedSeats: Map<number, number> = new Map(); // For counter tables: tableId -> usedSeats
             let unassignedReservationCount = 0;
+
+            // Get active tables first for type checking
+            const tables = (store as any).tables || [];
+            const activeTables = tables.filter((t: any) => t.isActive);
 
             overlappingReservations.forEach(r => {
                 const res = r as any;
                 if (res.assignedTables && res.assignedTables.length > 0) {
-                    res.assignedTables.forEach((t: any) => usedTableIds.add(t.id));
+                    res.assignedTables.forEach((t: any) => {
+                        // Check if this is a counter-type table
+                        const tableInStore = activeTables.find((st: any) => st.id === t.id);
+                        if (tableInStore && tableInStore.type === 'counter') {
+                            // For counters, track used seats instead of marking entire table as used
+                            const currentUsed = counterUsedSeats.get(t.id) || 0;
+                            counterUsedSeats.set(t.id, currentUsed + (res.guests || 1));
+                        } else {
+                            // Non-counter tables are fully occupied by any reservation
+                            usedTableIds.add(t.id);
+                        }
+                    });
                 } else {
                     unassignedReservationCount++;
                 }
             });
 
-            // Available Tables = Store Tables - Used Tables
-            const tables = (store as any).tables || [];
-            const activeTables = tables.filter((t: any) => t.isActive);
-            const availableTables = activeTables.filter((t: any) => !usedTableIds.has(t.id));
+            // Log counter seat usage
+            console.log(`[Counter] Seat usage:`, Array.from(counterUsedSeats.entries()).map(([id, used]) => {
+                const t = activeTables.find((x: any) => x.id === id);
+                return `${t?.name || id}: ${used}/${t?.maxCapacity || t?.capacity || 5}`;
+            }).join(', ') || 'none');
 
-            console.log(`[DEBUG] Tables Total: ${tables.length}, Active: ${activeTables.length}, Used: ${usedTableIds.size}, Free: ${availableTables.length}, Unassigned Res: ${unassignedReservationCount}`);
+            // Available Tables = Store Tables - Used Tables (for non-counter)
+            // For counters, check remaining capacity
+            const availableTables = activeTables.filter((t: any) => {
+                if (t.type === 'counter') {
+                    // Counter: check if remaining capacity can fit guests
+                    const usedSeats = counterUsedSeats.get(t.id) || 0;
+                    const maxSeats = t.maxCapacity || t.capacity || 5;
+                    const remainingSeats = maxSeats - usedSeats;
+                    return remainingSeats >= guests;
+                } else {
+                    // Non-counter: check if not fully occupied
+                    return !usedTableIds.has(t.id);
+                }
+            });
 
-            // 5. 【最適化エンジン】優先順位に基づいたソート
-            // 4. 収容可能（人数が収まる）な席に絞り込み
-            let assignedTables: any[] = [];
-            let candidateTable: any = null;
+            console.log(`[DEBUG] Tables Total: ${tables.length}, Active: ${activeTables.length}, Used (non-counter): ${usedTableIds.size}, Counter tables with partial use: ${counterUsedSeats.size}, Available for ${guests} guests: ${availableTables.length}`);
 
-            // 特殊ロジック: カウンター席（定員1名）の複数割り当て
-            // 条件: ゲスト数 <= 4 (あまり大人数でカウンター連番は難しいため制限してもよいが、ここでは柔軟に)
-            // かつ、カウンター席の在庫がある場合
-            const counterSeats = availableTables.filter((t: any) =>
-                (t.type === 'counter' || t.name.includes('カウンター')) &&
-                (t.maxCapacity === 1 || t.capacity === 1)
-            );
 
-            // カウンターロジックを試行するか？（少人数、またはカウンター希望ロジックがあれば）
-            // ここでは「カウンター席が人数分以上空いていれば」優先的にチェックする戦略とします。
-            // ただし、テーブル席の方が良い場合もあるため、あくまで「候補」として並列で考えるか、
-            // 「2名以下ならカウンター優先」などのルールに従う。
+            const allowOverCapacity = (store as any).allowOverCapacity === true;
 
-            // ルール: 2名以下ならカウンターを優先して確保を試みる
-            // それ以上、またはカウンター確保失敗ならテーブル席を探す
+            // ===== SIMPLIFIED SEAT ASSIGNMENT LOGIC (v2) =====
+            // Phase 1: Find tables that can accommodate guests (using maxCapacity as limit)
+            const fitTables = availableTables.filter((t: any) => {
+                const tMin = t.minCapacity || 1;
+                if (t.type === 'counter') {
+                    // Counter: remaining capacity is the limit
+                    const usedSeats = counterUsedSeats.get(t.id) || 0;
+                    const maxSeats = t.maxCapacity || t.capacity || 5;
+                    const remainingSeats = maxSeats - usedSeats;
+                    return guests >= tMin && guests <= remainingSeats;
+                } else {
+                    const tMax = t.maxCapacity || t.baseCapacity || t.capacity || 4;
+                    return guests >= tMin && guests <= tMax;
+                }
+            });
 
-            let counterSuccess = false;
+            // Phase 2: Find tables where guests can fit but exceed baseCapacity (over-capacity)
+            const overCapacityTables = allowOverCapacity ? availableTables.filter((t: any) => {
+                const tMin = t.minCapacity || 1;
+                const tBase = t.baseCapacity || t.capacity || 4;
+                const tMax = t.maxCapacity || tBase;
+                // Already in fitTables (guests <= tMax), so check if guests > tBase
+                return guests >= tMin && guests <= tMax && guests > tBase;
+            }) : [];
 
-            if (guests <= 3 && counterSeats.length >= guests) {
-                // ソート（名前順やsortOrder順）
-                counterSeats.sort((a: any, b: any) => (a.sortOrder || 999) - (b.sortOrder || 999));
+            console.log(`[SeatAssign] FitTables: ${fitTables.length}, OverCapacity: ${overCapacityTables.length}`);
 
-                // 1. 連番（Sequential）チェック
-                for (let i = 0; i <= counterSeats.length - guests; i++) {
-                    const block = counterSeats.slice(i, i + guests);
+            // Phase 3: Resolve priority list
+            const guestsNum = Number(guests); // Ensure numeric comparison
+            const assignmentPriorities = (store as any).assignmentPriorities || {};
+            let priorityList: string[] = [];
+            let foundPriority = false;
 
-                    const isSequential = block.every((t: any, idx: number) => {
-                        if (idx === 0) return true;
-                        const prev = block[idx - 1];
+            console.log(`[SeatAssign] guests=${guests} (type: ${typeof guests}), guestsNum=${guestsNum}, assignmentPriorities keys: ${Object.keys(assignmentPriorities).join(',') || 'none'}`);
 
-                        // 1. Try SortOrder
-                        if (t.sortOrder && prev.sortOrder) {
-                            if (t.sortOrder - prev.sortOrder === 1) return true;
-                        }
-
-                        // 2. Fallback: Name-based check (e.g. "Counter-1", "Counter-2")
-                        const nameMatch = t.name.match(/(\d+)$/);
-                        const prevMatch = prev.name.match(/(\d+)$/);
-                        if (nameMatch && prevMatch) {
-                            const num = parseInt(nameMatch[1], 10);
-                            const prevNum = parseInt(prevMatch[1], 10);
-                            if (num - prevNum === 1) return true;
-                        }
-
-                        return false;
-                    });
-
-                    if (isSequential) {
-                        assignedTables = block;
-                        counterSuccess = true;
-                        console.log(`[StoreService] Assigned Sequential Counters: ${block.map((t: any) => t.name).join(', ')}`);
+            for (const key in assignmentPriorities) {
+                const setting = assignmentPriorities[key];
+                if (setting && setting.range && Array.isArray(setting.range) && setting.priority) {
+                    const [min, max] = setting.range;
+                    const cleanMax = max === null || max === undefined ? 999 : max;
+                    if (guestsNum >= min && guestsNum <= cleanMax) {
+                        priorityList = setting.priority;
+                        foundPriority = true;
+                        console.log(`[SeatAssign] Matched priority config '${key}': range=[${min},${cleanMax}], priority=${setting.priority.join(',')}`);
                         break;
                     }
                 }
+            }
 
-                // 2. バラ席（Scattered）チェック（連番失敗時）
-                // 2名ならバラ席でも許容するか？ -> 基本は連番推奨だが、空いていれば案内可能とするか。
-                if (!counterSuccess && guests <= 2) { // 2名までならバラでもOKとする
-                    assignedTables = counterSeats.slice(0, guests);
-                    counterSuccess = true;
-                    console.log(`[StoreService] Assigned Scattered Counters: ${assignedTables.map((t: any) => t.name).join(', ')}`);
+            if (!foundPriority) {
+                if (guestsNum <= 2) {
+                    priorityList = ['counter', 'table', 'private'];
+                } else if (guestsNum <= 4) {
+                    priorityList = ['table', 'private', 'counter'];
+                } else {
+                    priorityList = ['private', 'table'];
                 }
             }
 
-            if (counterSuccess) {
-                // カウンター確保成功。
-                // candidateTable（代表）は最初の席にしておく（後方互換性のため）
-                candidateTable = assignedTables[0];
-            } else {
-                // 既存のテーブルロジック（単一テーブルで収まる場所を探す）
-                const candidateTables = availableTables.filter((t: any) => {
-                    const tMax = t.maxCapacity || t.baseCapacity || t.capacity || 20;
-                    return tMax >= guests;
-                });
+            console.log(`[SeatAssign] PriorityList: ${priorityList.join(',')}`);
 
-                if (candidateTables.length === 0) {
-                    return {
-                        available: false,
-                        capacityUsed: 100, // Effectively full for this request
-                        requiredDuration,
-                        reason: 'No suitable table available',
-                        action: 'reject'
-                    };
+            // Phase 4: Find best match using staged fallback
+            // Stage A: Priority type with exact/under capacity
+            // Stage B: Any type with exact/under capacity  
+            // Stage C: Over-capacity (if allowed)
+            // Stage D: Reject or call_store
+
+            let selectedTable: any = null;
+            let matchStage = '';
+
+            // Helper to get best fit from a list (smallest capacity that fits)
+            const getBestFit = (tables: any[], types?: string[]) => {
+                let filtered = tables;
+                if (types && types.length > 0) {
+                    filtered = tables.filter((t: any) => {
+                        const tType = t.type || 'table';
+                        return types.includes(tType);
+                    });
                 }
+                if (filtered.length === 0) return null;
 
-                candidateTables.sort((a: any, b: any) => {
-                    // ルール1: 人数による席タイプの優先順位
-                    const typeA = a.type || 'table';
-                    const typeB = b.type || 'table';
-
-                    const priority = (guests <= 2)
-                        ? { counter: 1, table: 2, private: 3 } // 少人数はカウンター（ここに来るのはCap>=2のカウンターがある場合）
-                        : { table: 1, private: 2, counter: 3 };
-
-                    const pA = priority[typeA as keyof typeof priority] ?? 99;
-                    const pB = priority[typeB as keyof typeof priority] ?? 99;
-
-                    if (pA !== pB) return pA - pB;
-
-                    // ルール2: ベストフィット
-                    const maxCapacityA = a.maxCapacity || a.baseCapacity || 99;
-                    const maxCapacityB = b.maxCapacity || b.baseCapacity || 99;
-                    return maxCapacityA - maxCapacityB;
+                // Sort by capacity (ascending) - prefer smallest that fits
+                filtered.sort((a: any, b: any) => {
+                    const capA = a.maxCapacity || a.baseCapacity || a.capacity || 4;
+                    const capB = b.maxCapacity || b.baseCapacity || b.capacity || 4;
+                    return capA - capB;
                 });
+                return filtered[0];
+            };
 
-                candidateTable = candidateTables[0];
-                assignedTables = [candidateTable];
+            // Stage A: Priority types in fit tables
+            for (const pType of priorityList) {
+                const match = getBestFit(fitTables, [pType]);
+                if (match) {
+                    selectedTable = match;
+                    matchStage = `A(${pType})`;
+                    break;
+                }
             }
 
+            // Stage B: Any type in fit tables
+            if (!selectedTable && fitTables.length > 0) {
+                selectedTable = getBestFit(fitTables);
+                matchStage = 'B(any)';
+            }
 
-            if (candidateTable) {
-                // Determine capacity usage roughly
-                const totalUsed = overlappingReservations.reduce((acc, r: any) => acc + (r.guests || 0), 0);
-                const capacityUsed = Math.round((totalUsed / (store.maxCapacity || 100)) * 100);
+            // Stage C: Over-capacity tables
+            if (!selectedTable && overCapacityTables.length > 0) {
+                selectedTable = getBestFit(overCapacityTables);
+                matchStage = 'C(over)';
+            }
+
+            // Phase 5: Return result
+            if (selectedTable) {
+                const capacity = selectedTable.maxCapacity || selectedTable.baseCapacity || selectedTable.capacity || 4;
+                const bookingAcceptanceMode = (store as any).bookingAcceptanceMode || 'manual';
+
+                console.log(`[SeatAssign] Selected: ${selectedTable.name} (Stage ${matchStage}), DocID: ${selectedTable.documentId}, BookingMode: ${bookingAcceptanceMode}`);
 
                 return {
                     available: true,
-                    capacityUsed,
+                    capacityUsed: Math.round((guests / capacity) * 100),
                     requiredDuration,
-                    endTime: endTimeStr,
-                    isOvernight,
+                    reason: '',
                     action: 'proceed',
-                    candidateTable: candidateTable,
-                    assignedTables: assignedTables,
-                    storeLocale: (store as any).locale,
-                    storeIdInt: (store as any).id,
-                    bookingAcceptanceMode: (store as any).bookingAcceptanceMode
+                    candidateTable: selectedTable,
+                    assignedTables: [selectedTable],
+                    bookingAcceptanceMode
                 };
             } else {
-                // Should be covered by length check above, but safe fallback
+                // Stage D: No table found
+                const rejectionStrategy = (store as any).rejectionStrategy || 'auto_reject';
+                const action = rejectionStrategy === 'call_request' ? 'call_store' : 'reject';
+                const reason = rejectionStrategy === 'call_request'
+                    ? 'No suitable table, please contact the store'
+                    : 'No suitable table available for this party size';
+
+                console.log(`[SeatAssign] No match found. Action: ${action}`);
+
                 return {
                     available: false,
                     capacityUsed: 100,
                     requiredDuration,
-                    reason: 'No suitable table available',
-                    action: 'reject'
+                    reason,
+                    action
                 };
             }
 

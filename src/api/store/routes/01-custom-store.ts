@@ -5,6 +5,7 @@ export default {
             path: '/stores/:id/check-availability',
             handler: 'store.checkAvailability',
             config: {
+                auth: false,
                 policies: [],
                 middlewares: [],
             },
