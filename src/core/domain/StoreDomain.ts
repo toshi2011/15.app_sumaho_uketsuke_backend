@@ -221,6 +221,61 @@ export const StoreDomain = {
     },
 
     /**
+     * 緩和条件でゲスト人数に適合するテーブルをフィルタリング
+     * Stage 2用: minCapacityを無視し、効率性チェックを適用
+     * 厳密マッチ（getFittingTables）で候補が0件の場合にのみ使用
+     * 
+     * @param tables 利用可能テーブル配列
+     * @param guests ゲスト人数
+     * @param counterUsedSeats カウンター使用席数のマップ
+     * @param config ResolvedStoreConfig（店舗別の閾値設定を含む）
+     * @returns 適合するテーブル配列（無駄席数の少ない順にソート済み）
+     */
+    getLooseFittingTables: (
+        tables: ResolvedTableConfig[],
+        guests: number,
+        counterUsedSeats: Map<number, number>,
+        config: ResolvedStoreConfig
+    ): ResolvedTableConfig[] => {
+        const minEfficiency = config.looseMatchMinEfficiency;
+        const maxWastedSeats = config.looseMatchMaxWastedSeats;
+
+        const looseTables = tables.filter(t => {
+            if (t.type === 'counter') {
+                // カウンターは残席チェックのみ（効率性チェック対象外）
+                // ※本来の厳密マッチで弾かれている場合のみここに来るが、
+                // カウンターは通常minCapacity=1なので厳密マッチで拾われるはず。
+                // ここでは念のため実装しておく。
+                const usedSeats = counterUsedSeats.get(t.id) || 0;
+                const remainingSeats = t.maxCapacity - usedSeats;
+                return guests <= remainingSeats;
+            } else {
+                // 緩和条件: 最大人数に収まること
+                if (guests > t.maxCapacity) return false;
+
+                // 効率性チェック（店舗設定に基づく）
+                const efficiency = guests / t.maxCapacity;
+                const wastedSeats = t.maxCapacity - guests;
+
+                // 効率が良い、かつ無駄が許容範囲内であればOK
+                return efficiency >= minEfficiency && wastedSeats <= maxWastedSeats;
+            }
+        });
+
+        // 無駄席数が少ない順にソート（最適席を優先）
+        // 同じ無駄席数の場合はid順で安定ソート（デバッグ容易性のため）
+        return looseTables.sort((a, b) => {
+            const wastedA = a.maxCapacity - guests;
+            const wastedB = b.maxCapacity - guests;
+            if (wastedA !== wastedB) {
+                return wastedA - wastedB;
+            }
+            // 同じ無駄席数ならid順
+            return a.id - b.id;
+        });
+    },
+
+    /**
      * 最適なテーブルを選択（最小容量で収まるものを優先）
      * @param tables テーブル配列
      * @param types 優先タイプ（指定がなければ全て対象）

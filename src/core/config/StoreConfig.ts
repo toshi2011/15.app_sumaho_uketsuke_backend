@@ -46,6 +46,10 @@ export interface ResolvedStoreConfig {
     // ルール
     lastOrderOffset: number;
 
+    // 緩和マッチ設定 (Loose Matching)
+    looseMatchMinEfficiency: number;
+    looseMatchMaxWastedSeats: number;
+
     // 元の店舗エンティティ (参照用)
     rawstore: any;
 
@@ -74,6 +78,11 @@ const DEFAULTS = {
 
     // ロジック設定 (Logic)
     LAST_ORDER_OFFSET: 15,
+
+    // 緩和マッチング設定 (Loose Matching)
+    // 厳密マッチ（minCapacity条件）が失敗した場合のフォールバック用
+    LOOSE_MATCH_MIN_EFFICIENCY: 0.5,     // 最小効率 (50%) - 席の半分以上埋まること
+    LOOSE_MATCH_MAX_WASTED_SEATS: 2,     // 最大許容空席数
 
     // 座席設定 (Seat Defaults)
     SEAT_SETTINGS: {
@@ -140,6 +149,17 @@ export const StoreConfig = {
         const dinnerDuration = resolveNum(safeStore.dinnerDuration, DEFAULTS.DINNER_DURATION);
         const maxDuration = resolveNum(safeStore.maxDurationLimit, DEFAULTS.MAX_DURATION);
 
+        // Resolve Loose Match Settings (緩和マッチ設定)
+        // 店舗DBに設定があればそれを使用、なければデフォルト値
+        const looseMatchMinEfficiency = resolveNum(
+            safeStore.looseMatchMinEfficiency,
+            DEFAULTS.LOOSE_MATCH_MIN_EFFICIENCY
+        );
+        const looseMatchMaxWastedSeats = resolveNum(
+            safeStore.looseMatchMaxWastedSeats,
+            DEFAULTS.LOOSE_MATCH_MAX_WASTED_SEATS
+        );
+
         return {
             lunchDuration: lunchDuration.value,
             dinnerDuration: dinnerDuration.value,
@@ -152,6 +172,10 @@ export const StoreConfig = {
             dinnerEndMin: dinnerEndMin,
 
             lastOrderOffset: DEFAULTS.LAST_ORDER_OFFSET,
+
+            // 緩和マッチ設定
+            looseMatchMinEfficiency: looseMatchMinEfficiency.value,
+            looseMatchMaxWastedSeats: looseMatchMaxWastedSeats.value,
 
             rawstore: safeStore,
 

@@ -231,12 +231,27 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
             const allowOverCapacity = (store as any).allowOverCapacity === true;
 
             // ===== USE StoreDomain for seat assignment =====
-            // Phase 1: Find tables that can accommodate guests
+            // Phase 1: Find tables that can accommodate guests (Strict Match)
             const fitTables = StoreDomain.getFittingTables(
                 availableTables,
                 guests,
                 counterUsedSeats
             );
+
+            // Phase 1.5: Loose Match calculation (if strict match fails)
+            // 厳密マッチが0件の場合のみ、緩和マッチを計算
+            let looseFitTables: ResolvedTableConfig[] = [];
+            if (fitTables.length === 0) {
+                looseFitTables = StoreDomain.getLooseFittingTables(
+                    availableTables,
+                    guests,
+                    counterUsedSeats,
+                    config
+                );
+                if (looseFitTables.length > 0) {
+                    console.log(`[SeatAssign] Loose Match Candidates: ${looseFitTables.length} (Eff>=${config.looseMatchMinEfficiency}, Wasted<=${config.looseMatchMaxWastedSeats})`);
+                }
+            }
 
             // Phase 2: Find tables where guests can fit but exceed baseCapacity (over-capacity)
             const overCapacityTables = allowOverCapacity ? availableTables.filter(t => {
@@ -244,7 +259,7 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
                 return guests >= t.minCapacity && guests <= t.maxCapacity && guests > t.baseCapacity;
             }) : [];
 
-            console.log(`[SeatAssign] FitTables: ${fitTables.length}, OverCapacity: ${overCapacityTables.length}`);
+            console.log(`[SeatAssign] FitTables: ${fitTables.length}, LooseFit: ${looseFitTables.length}, OverCapacity: ${overCapacityTables.length}`);
 
             // === USE StoreDomain for priority list ===
             const guestsNum = Number(guests);
@@ -254,8 +269,10 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
             console.log(`[SeatAssign] guests=${guests}, priorityList=${priorityList.join(',')}`);
 
             // Phase 4: Find best match using staged fallback
-            // Stage A: Priority type with exact/under capacity
-            // Stage B: Any type with exact/under capacity  
+            // Stage A: Priority type with strict match
+            // Stage B: Any type with strict match  
+            // Stage B2: Priority type with loose match (緩和マッチ)
+            // Stage B3: Any type with loose match (緩和マッチ)
             // Stage C: Over-capacity (if allowed)
             // Stage D: Reject or call_store
 
@@ -276,6 +293,25 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
             if (!selectedTable && fitTables.length > 0) {
                 selectedTable = StoreDomain.getBestFit(fitTables);
                 matchStage = 'B(any)';
+            }
+
+            // Stage B2: Priority types in loose fit tables (緩和マッチ)
+            // looseFitTables は既に「無駄が少ない順」にソート済み
+            if (!selectedTable && looseFitTables.length > 0) {
+                for (const pType of priorityList) {
+                    const match = looseFitTables.find(t => t.type === pType);
+                    if (match) {
+                        selectedTable = match;
+                        matchStage = `B2(${pType}-loose)`;
+                        break;
+                    }
+                }
+            }
+
+            // Stage B3: Any type in loose fit tables (緩和マッチ - タイプ不問)
+            if (!selectedTable && looseFitTables.length > 0) {
+                selectedTable = looseFitTables[0]; // ソート済みなので先頭が最適
+                matchStage = 'B3(loose)';
             }
 
             // Stage C: Over-capacity tables
