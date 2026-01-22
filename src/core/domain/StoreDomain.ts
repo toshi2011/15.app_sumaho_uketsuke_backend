@@ -387,5 +387,51 @@ export const StoreDomain = {
     isTimeOverlap: (aStart: number, aEnd: number, bStart: number, bEnd: number): boolean => {
         // 既存予約の開始 < 今回の終了 AND 既存予約の終了 > 今回の開始
         return aStart < bEnd && aEnd > bStart;
+    },
+
+    /**
+     * コース選択時の滞在時間を取得
+     * コースが選択されている場合はコースの duration を優先し、
+     * 選択されていない場合は時間帯に応じた StoreConfig のデフォルト時間を使用
+     * 
+     * @param courseId 選択されたコースのID（documentId または数値ID）、null の場合は席のみ予約
+     * @param menuItems 店舗のメニュー項目リスト（isCourse, duration を含む）
+     * @param timeStr 予約時間 "HH:mm"
+     * @param config ResolvedStoreConfig
+     * @returns { duration: number, source: 'course' | 'default', courseName?: string }
+     */
+    getCourseDuration: (
+        courseId: string | number | null,
+        menuItems: any[],
+        timeStr: string,
+        config: ResolvedStoreConfig
+    ): { duration: number; source: 'course' | 'default'; courseName?: string } => {
+        // コースIDが指定されている場合、該当コースを検索
+        if (courseId && menuItems && Array.isArray(menuItems)) {
+            const course = menuItems.find((m: any) => {
+                // documentId または id でマッチング
+                return m.documentId === courseId ||
+                    String(m.id) === String(courseId) ||
+                    m.id === Number(courseId);
+            });
+
+            // コースが見つかり、isCourse=true かつ duration が設定されている場合
+            if (course && course.isCourse === true && course.duration) {
+                console.log(`[StoreDomain] Using Course Duration: ${course.duration}min (${course.name})`);
+                return {
+                    duration: Math.min(course.duration, config.maxDuration),
+                    source: 'course',
+                    courseName: course.name
+                };
+            }
+        }
+
+        // コースが指定されていない or 見つからない場合はデフォルト時間を使用
+        const defaultDuration = StoreDomain.getDuration(timeStr, config);
+        console.log(`[StoreDomain] Using Default Duration: ${defaultDuration}min (${StoreDomain.isLunchTime(timeStr, config) ? 'lunch' : 'dinner'})`);
+        return {
+            duration: defaultDuration,
+            source: 'default'
+        };
     }
 };

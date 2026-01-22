@@ -15,11 +15,14 @@ export default factories.createCoreController('api::reservation.reservation', ({
                     // Skip check logic if requested (e.g. Owner Override)
                     if (!data.skipAvailabilityCheck && (!data.assignedTables || data.assignedTables.length === 0)) {
                         const storeService = strapi.service('api::store.store');
+                        // コースIDが指定されている場合はcheckAvailabilityに渡す
+                        const courseId = data.courseId || null;
                         const result = await (storeService as any).checkAvailability(
                             data.store,
                             data.date,
                             data.time,
-                            data.guests
+                            data.guests,
+                            courseId
                         );
 
                         if (!result.available) {
@@ -41,6 +44,10 @@ export default factories.createCoreController('api::reservation.reservation', ({
                         // checkAvailability returns requiredDuration based on StoreConfig
                         if (result.requiredDuration) {
                             data.duration = result.requiredDuration;
+                        }
+                        // コース名を保存
+                        if (result.courseName) {
+                            data.course = result.courseName;
                         }
 
                         // Store ID/Locale Fixes
@@ -65,15 +72,22 @@ export default factories.createCoreController('api::reservation.reservation', ({
                     // For Ticket 02: "Backend determines". 
                     // Check if duration is missing, resolve it again if so.
                     if (!data.duration) {
-                        // Ticket 01: Ensure full store config is loaded with populate: '*'
-                        const storeEnt = await strapi.entityService.findOne('api::store.store', data.store, { populate: '*' });
+                        // Ticket 01: Ensure full store config is loaded
+                        const storeEnt = await strapi.entityService.findOne('api::store.store', data.store, {
+                            populate: ['menuItems'] as any
+                        });
                         const config = StoreConfig.resolve(storeEnt);
+                        const menuItems = (storeEnt as any)?.menuItems || [];
 
-                        console.log(`[Reservation] Manual Duration Resolution: TargetTime=${data.time}, LunchEnd=${config.lunchEndMin}, LunchDur=${config.lunchDuration}, DinnerDur=${config.dinnerDuration}`);
+                        console.log(`[Reservation] Manual Duration Resolution: TargetTime=${data.time}, CourseId=${data.courseId || 'none'}`);
 
-                        // === USE StoreDomain for duration calculation ===
-                        data.duration = StoreDomain.getDuration(data.time, config);
-                        console.log(`[Reservation] Applied Duration via StoreDomain: ${data.duration} min`);
+                        // === USE StoreDomain.getCourseDuration for duration calculation (includes course support) ===
+                        const durationResult = StoreDomain.getCourseDuration(data.courseId || null, menuItems, data.time, config);
+                        data.duration = durationResult.duration;
+                        if (durationResult.courseName) {
+                            data.course = durationResult.courseName;
+                        }
+                        console.log(`[Reservation] Applied Duration via StoreDomain: ${data.duration} min (source: ${durationResult.source})`);
                     }
 
                     const startMin = timeToMinutes(data.time);

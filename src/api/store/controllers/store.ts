@@ -19,7 +19,7 @@ export default factories.createCoreController('api::store.store', ({ strapi }) =
 
     async checkAvailability(ctx) {
         const { id } = ctx.params;
-        const { date, time, guests } = ctx.query;
+        const { date, time, guests, courseId } = ctx.query;
 
         if (!date || !time || !guests) {
             return ctx.badRequest('Missing required parameters: date, time, guests');
@@ -30,7 +30,8 @@ export default factories.createCoreController('api::store.store', ({ strapi }) =
                 id,
                 date,
                 time,
-                parseInt(String(guests), 10)
+                parseInt(String(guests), 10),
+                courseId || null  // コースIDをサービスに渡す
             );
 
             return result;

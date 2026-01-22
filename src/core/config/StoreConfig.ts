@@ -45,6 +45,8 @@ export interface ResolvedStoreConfig {
 
     // ルール
     lastOrderOffset: number;
+    bookingAcceptanceMode: 'auto' | 'manual';
+    rejectionStrategy: 'auto_reject' | 'call_request';
 
     // 緩和マッチ設定 (Loose Matching)
     looseMatchMinEfficiency: number;
@@ -172,6 +174,8 @@ export const StoreConfig = {
             dinnerEndMin: dinnerEndMin,
 
             lastOrderOffset: DEFAULTS.LAST_ORDER_OFFSET,
+            bookingAcceptanceMode: safeStore.bookingAcceptanceMode || 'manual',
+            rejectionStrategy: safeStore.rejectionStrategy || 'auto_reject',
 
             // 緩和マッチ設定
             looseMatchMinEfficiency: looseMatchMinEfficiency.value,

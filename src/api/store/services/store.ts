@@ -19,12 +19,12 @@ const formatMin = (min: number) => {
 };
 
 export default factories.createCoreService('api::store.store', ({ strapi }) => ({
-    async checkAvailability(storeDocumentId, date, time, guests) {
+    async checkAvailability(storeDocumentId, date, time, guests, courseId = null) {
         try {
             // 1. Fetch store settings and tables
             // Ticket 01: Explicitly use documentId
             let store = await strapi.entityService.findOne('api::store.store', storeDocumentId, {
-                populate: '*' // StoreConfig用の設定値を全て取得するため '*' に変更
+                populate: ['tables', 'businessHours', 'menuItems'] as any // tables, businessHours, menuItems を明示的に取得
             });
 
             if (!store) {
@@ -59,17 +59,14 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
             }
 
             let isLunch = false;
-            let currentBaseDuration = 90;
             let closingMin = 0;
 
             // Rule B: Range Classification & Gap Check
             if (adjustedTargetStart >= config.lunchStartMin && adjustedTargetStart < config.lunchEndMin) {
                 isLunch = true;
-                currentBaseDuration = config.lunchDuration;
                 closingMin = config.lunchEndMin;
             } else if (adjustedTargetStart >= config.dinnerStartMin && adjustedTargetStart < config.dinnerEndMin) {
                 isLunch = false;
-                currentBaseDuration = config.dinnerDuration;
                 closingMin = config.dinnerEndMin;
             } else {
                 return {
@@ -80,6 +77,13 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
                     action: 'reject'
                 };
             }
+
+            // === コース選択に基づく滞在時間の決定 ===
+            const menuItems = (store as any).menuItems || [];
+            const durationResult = StoreDomain.getCourseDuration(courseId, menuItems, time, config);
+            const currentBaseDuration = durationResult.duration;
+            console.log(`[StoreService] Duration resolved: ${currentBaseDuration}min (source: ${durationResult.source}${durationResult.courseName ? ', course: ' + durationResult.courseName : ''})`);
+
 
             // Duration Calculation
             let requiredDuration = Math.min(currentBaseDuration, config.maxDuration);
@@ -331,12 +335,17 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
                 return {
                     available: true,
                     capacityUsed: Math.round((guests / capacity) * 100),
-                    requiredDuration,
-                    reason: '',
-                    action: 'proceed',
                     candidateTable: selectedTable,
                     assignedTables: [selectedTable],
-                    bookingAcceptanceMode
+                    requiredDuration,
+                    courseName: durationResult.courseName, // コース名を追加
+                    endTime: endTimeStr,
+                    isOvernight,
+                    action: 'proceed', // or 'pending_review'
+                    reason: 'Available',
+                    bookingAcceptanceMode: config.bookingAcceptanceMode, // pass config
+                    storeIdInt: store.id,
+                    storeLocale: (store as any).locale
                 };
             } else {
                 // Stage D: No table found

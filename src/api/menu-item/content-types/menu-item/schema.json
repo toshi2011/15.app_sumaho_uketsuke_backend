@@ -35,6 +35,15 @@
             "relation": "manyToOne",
             "target": "api::store.store",
             "inversedBy": "menuItems"
+        },
+        "isCourse": {
+            "type": "boolean",
+            "default": false
+        },
+        "duration": {
+            "type": "integer",
+            "min": 60,
+            "max": 180
         }
     }
 }
