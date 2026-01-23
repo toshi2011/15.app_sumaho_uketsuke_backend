@@ -483,6 +483,7 @@ export interface ApiCustomerCustomer extends Struct.CollectionTypeSchema {
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     email: Schema.Attribute.Email;
+    internalNote: Schema.Attribute.Text;
     lastVisitDate: Schema.Attribute.Date;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
@@ -606,6 +607,9 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
     draftAndPublish: false;
   };
   attributes: {
+    aiAdvice: Schema.Attribute.Text;
+    aiAnalysisResult: Schema.Attribute.JSON;
+    aiReason: Schema.Attribute.Text;
     assignedTables: Schema.Attribute.Relation<'manyToMany', 'api::table.table'>;
     confirmedAt: Schema.Attribute.DateTime;
     course: Schema.Attribute.String;

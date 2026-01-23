@@ -16,6 +16,7 @@
     "seed:stores": "ts-node scripts/bulk-import-stores.ts"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@strapi/plugin-cloud": "5.33.0",
     "@strapi/plugin-users-permissions": "5.33.0",
     "@strapi/strapi": "5.33.0",

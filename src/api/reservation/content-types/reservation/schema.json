@@ -110,6 +110,15 @@
         "isOvernight": {
             "type": "boolean",
             "default": false
+        },
+        "aiAnalysisResult": {
+            "type": "json"
+        },
+        "aiReason": {
+            "type": "text"
+        },
+        "aiAdvice": {
+            "type": "text"
         }
     }
 }

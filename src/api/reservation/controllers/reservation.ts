@@ -2,15 +2,88 @@ import { factories } from '@strapi/strapi';
 import { StoreConfig } from '../../../core/config/StoreConfig';
 import { StoreDomain } from '../../../core/domain/StoreDomain';
 import { timeToMinutes, minutesToTime } from '../../../utils/timeUtils'; // Need minutesToTime
+import { AiService } from '../../../core/services/ai';
 
 export default factories.createCoreController('api::reservation.reservation', ({ strapi }) => ({
     async create(ctx) {
+        const { data } = ctx.request.body;
+
+        // Ticket-AI-03: CRM Advice & Customer Linking
+        // Pre-process Customer Creation OUTSIDE of Transaction
+        // preventing transaction abort checking logic from blocking fallback
+        let linkedCustomerId = null;
+        let customerContextText = "";
+        let linkedCustomerData = null;
+
+        if (data && data.phone) {
+            try {
+                // 1. Try to find existing
+                const customers = await strapi.db.query('api::customer.customer').findMany({
+                    where: { phone: data.phone },
+                    populate: ['reservations'],
+                    limit: 1
+                });
+                let customer = customers && customers.length > 0 ? customers[0] : null;
+
+                // 2. If not found, create new
+                if (!customer && data.name) {
+                    try {
+                        strapi.log.info(`[Reservation] Creating new customer for phone: ${data.phone}`);
+                        customer = await strapi.entityService.create('api::customer.customer', {
+                            data: {
+                                phone: data.phone,
+                                name: data.name,
+                                email: data.email,
+                                store: data.store
+                            }
+                        });
+                    } catch (createErr) {
+                        strapi.log.warn('[Reservation] Failed to create customer with email, checking if conflict or other error...', createErr);
+
+                        // Retry without email (Fallback)
+                        try {
+                            customer = await strapi.entityService.create('api::customer.customer', {
+                                data: {
+                                    phone: data.phone,
+                                    name: data.name,
+                                    // email omitted
+                                    store: data.store
+                                }
+                            });
+                            strapi.log.info(`[Reservation] Created customer (without email) for phone: ${data.phone}`);
+                        } catch (retryErr) {
+                            strapi.log.error('[Reservation] Failed to create customer even without email:', retryErr);
+                        }
+                    }
+                }
+
+                if (customer) {
+                    linkedCustomerId = customer.id;
+                    linkedCustomerData = customer;
+                    strapi.log.info(`[Reservation] Pre-linked Customer: ID=${customer.id}`);
+
+                    if (customer.internalNote) customerContextText += `顧客メモ: ${customer.internalNote}\n`;
+                    if (customer.reservations && customer.reservations.length > 0) {
+                        const pastNotes = customer.reservations
+                            .filter((r: any) => r.notes && r.notes.trim() !== '')
+                            .slice(-3)
+                            .map((r: any) => r.notes)
+                            .join(" / ");
+                        if (pastNotes) customerContextText += `過去の要望: ${pastNotes}`;
+                    }
+                }
+            } catch (e) {
+                strapi.log.error('[Reservation] Error in customer linking process:', e);
+            }
+        }
+
         // Transaction Wrapper
         return await strapi.db.transaction(async (transaction) => {
             try {
-                const { data } = ctx.request.body;
-
-                // 1. Availability Check & Logic
+                // Ensure data is ready (ctx.request.body is reference, so modifying 'data' above might persist, but better explicit)
+                if (linkedCustomerId) {
+                    data.customer = linkedCustomerId;
+                }
                 if (data && data.store && data.date && data.time && data.guests) {
                     // Skip check logic if requested (e.g. Owner Override)
                     if (!data.skipAvailabilityCheck && (!data.assignedTables || data.assignedTables.length === 0)) {
@@ -54,11 +127,56 @@ export default factories.createCoreController('api::reservation.reservation', ({
                         if (result.storeIdInt) data.store = result.storeIdInt;
                         if (result.storeLocale) data.locale = result.storeLocale;
 
+                        // Ticket-AI-02: AI Note Classification
+                        let aiRequiresAction = false;
+                        if (data.notes) {
+                            try {
+                                const aiResult = await AiService.classifyNote(data.notes);
+                                data.aiAnalysisResult = aiResult;
+                                data.aiReason = aiResult.reason;
+                                aiRequiresAction = aiResult.requiresAction;
+                                strapi.log.info(`[Reservation] AI Classify: Action=${aiRequiresAction}, Reason=${aiResult.reason}`);
+                            } catch (e) {
+                                strapi.log.error(`[Reservation] AI Classify Error:`, e);
+                                aiRequiresAction = true; // Safety fallback
+                            }
+                        }
+
+                        // Ticket-AI-03: CRM Advice (Using pre-calculated context)
+                        if (data.phone) {
+                            try {
+                                // If there is context or current notes, generate advice
+                                // Use customerContextText prepared outside
+                                if (customerContextText || (data.notes && data.notes.trim())) {
+                                    const advicePrompt = `
+                                      あなたはレストランの店主をサポートするAIです。
+                                      過去の顧客情報と今回の要望から、店主への接客アドバイスを生成してください。
+                                      
+                                      顧客情報: ${customerContextText || "なし"}
+                                      今回の要望: ${data.notes || "なし"}
+                                      
+                                      出力はアドバイスのテキストのみ（簡潔に一言二言で）。
+                                    `;
+                                    const advice = await AiService.generateLite(advicePrompt);
+                                    data.aiAdvice = advice;
+                                    strapi.log.info(`[Reservation] AI Advice Generated.`);
+                                }
+                            } catch (e) {
+                                strapi.log.error(`[Reservation] AI Advice Error:`, e);
+                            }
+                        }
+
                         // Ticket Auto-Confirm: Override status based on Store Config
                         console.log(`[ReservationController] Auto-Confirm Check: Mode=${result.bookingAcceptanceMode}, Action=${result.action}`);
                         if (result.bookingAcceptanceMode === 'auto' && result.action === 'proceed') {
-                            data.status = 'confirmed';
-                            data.confirmedAt = new Date().toISOString();
+                            if (aiRequiresAction) {
+                                strapi.log.info('[Reservation] AI Override: Notes require action. Status -> pending.');
+                                data.status = 'pending';
+                                data.requiresReview = true;
+                            } else {
+                                data.status = 'confirmed';
+                                data.confirmedAt = new Date().toISOString();
+                            }
                         }
                     }
                 }
