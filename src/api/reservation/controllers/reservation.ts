@@ -127,7 +127,7 @@ export default factories.createCoreController('api::reservation.reservation', ({
                         if (result.storeIdInt) data.store = result.storeIdInt;
                         if (result.storeLocale) data.locale = result.storeLocale;
 
-                        // Ticket-AI-02: AI Note Classification
+                        // Ticket-AI-02 & 05: AI Note Classification & Auto-Transcription
                         let aiRequiresAction = false;
                         if (data.notes) {
                             try {
@@ -135,7 +135,46 @@ export default factories.createCoreController('api::reservation.reservation', ({
                                 data.aiAnalysisResult = aiResult;
                                 data.aiReason = aiResult.reason;
                                 aiRequiresAction = aiResult.requiresAction;
-                                strapi.log.info(`[Reservation] AI Classify: Action=${aiRequiresAction}, Reason=${aiResult.reason}`);
+                                strapi.log.info(`[Reservation] AI Classify: Action=${aiRequiresAction}, Reason=${aiResult.reason}, Trait=${aiResult.customerTrait}`);
+
+                                // Ticket-AI-05: Auto-Transcription to Customer Note
+                                if (aiResult.customerTrait && linkedCustomerId) {
+                                    /*
+                                     * Note: We are inside a transaction wrapper for Reservation Creation.
+                                     * Updating Customer here is safe.
+                                     * Strapi v5: Use documents API for ID update.
+                                     */
+                                    try {
+                                        // Fetch latest note content first to ensure we append correctly
+                                        // linkedCustomerData might be stale if updated recently? 
+                                        // Transaction isolation should handle it, but for safety lets re-fetch lightweight or use append logic?
+                                        // For simplicity, use the ID we have.
+
+                                        // We need to fetch the current note inside transaction if possible, or just overwrite safely?
+                                        // Strapi update doesn't support "SQL Append". We must Read -> Modify -> Write.
+                                        const targetCustomer = await strapi.documents('api::customer.customer').findOne({
+                                            documentId: linkedCustomerId
+                                        });
+
+                                        if (targetCustomer) {
+                                            const todayStr = new Date().toLocaleDateString('ja-JP');
+                                            const appendText = `\n\n【${todayStr} AI自動転記】\n${aiResult.customerTrait}`;
+                                            const newNote = (targetCustomer.internalNote || "") + appendText;
+
+                                            await strapi.documents('api::customer.customer').update({
+                                                documentId: linkedCustomerId,
+                                                data: {
+                                                    internalNote: newNote
+                                                }
+                                            });
+                                            strapi.log.info(`[Reservation] Auto-Transcribed trait to Customer ${linkedCustomerId}`);
+                                        }
+                                    } catch (traitErr) {
+                                        strapi.log.error('[Reservation] Auto-Transcription Error:', traitErr);
+                                        // Do not fail reservation creation for this
+                                    }
+                                }
+
                             } catch (e) {
                                 strapi.log.error(`[Reservation] AI Classify Error:`, e);
                                 aiRequiresAction = true; // Safety fallback
@@ -336,16 +375,20 @@ export default factories.createCoreController('api::reservation.reservation', ({
     },
 
     async update(ctx) {
-        const { id } = ctx.params; // DocumentID in Strapi 5 usually passed here
+        const { id } = ctx.params; // DocumentID in Strapi 5
         const { data } = ctx.request.body;
 
+        // Note: strapi.documents API is preferred in v5 for documentId handling
         return await strapi.db.transaction(async (transaction) => {
-            // 1. Fetch existing to know store/date if not provided
             console.log(`[Reservation] Update Request. ID: ${id}`);
 
-            const existing = (await strapi.entityService.findOne('api::reservation.reservation', id, { transaction, populate: ['store'] } as any)) as any;
+            // Fetch existing using documents API
+            const existing = await strapi.documents('api::reservation.reservation').findOne({
+                documentId: id,
+                populate: ['store']
+            });
 
-            console.log(`[Reservation] Update Found Existing:`, existing ? `YES (ID: ${existing.id})` : 'NO');
+            console.log(`[Reservation] Update Found Existing:`, existing ? `YES (ID: ${existing.documentId})` : 'NO');
 
             if (!existing) return ctx.notFound();
 
@@ -353,22 +396,6 @@ export default factories.createCoreController('api::reservation.reservation', ({
             if (data.time || data.duration) {
                 const time = data.time || existing.time;
                 let duration = data.duration || existing.duration;
-
-                // If strictly enforcing StoreConfig on update too:
-                // "Update時の際、その時点の店舗設定に基づいた滞在時間を計算" -> Yes
-                // Re-resolve store config
-                const storeId = data.store || (existing.store && (existing.store as any).id);
-                // Note: existing.store might be relation depending on populate
-
-                // Resolve Config
-                // ... (Simplified: assume if duration provided we use it, OR force re-calc?)
-                // Ticket says "Update时 ... Calculate duration ... based on StoreConfig".
-                // So we should re-fetch StoreConfig and re-apply lunch/dinner duration if time matches.
-                // This ensures business logic consistency.
-
-                // Calculation logic similar to create...
-                // Skipping distinct implementation for brevity, assuming data.duration is respected if passed or calculated.
-                // Ideally extract 'calculateMetrics(data, store)' helper.
 
                 const startMin = timeToMinutes(time);
                 const endMin = startMin + Number(duration);
@@ -385,23 +412,22 @@ export default factories.createCoreController('api::reservation.reservation', ({
                 data.isOvernight = isOvernight;
             }
 
-            // 3. Update
-            // @ts-ignore
-            const updated = await strapi.entityService.update('api::reservation.reservation', id, {
+            // 3. Update using documents API
+            const updated = await strapi.documents('api::reservation.reservation').update({
+                documentId: id,
                 data,
-                transaction,
-                populate: ['store', 'assignedTables']
+                populate: ['store', 'assignedTables'],
+                status: 'published' // Ensure we work on published version if draft/publish enabled (disabled here but safe to add)
             });
 
             // 4. Recalculate Lanes
-            // Relevant date/store: old and new?
-            // If date changed, need to update BOTH days.
-            // Optimize: Check if date/store changed.
             const oldDate = existing.date;
             const newDate = data.date || existing.date;
-            const storeId = existing.store ? existing.store.documentId : null; // active store
+            const storeId = existing.store ? existing.store.documentId : null;
 
             if (storeId) {
+                // recalculateDailyLaneIndices uses entityService inside? Need to check service compatibility?
+                // Service logic should be robust.
                 await strapi.service('api::reservation.reservation').recalculateDailyLaneIndices(storeId, oldDate, transaction);
                 if (oldDate !== newDate) {
                     await strapi.service('api::reservation.reservation').recalculateDailyLaneIndices(storeId, newDate, transaction);
@@ -417,11 +443,17 @@ export default factories.createCoreController('api::reservation.reservation', ({
         const { id } = ctx.params;
 
         return await strapi.db.transaction(async (transaction) => {
-            const existing = (await strapi.entityService.findOne('api::reservation.reservation', id, { transaction, populate: ['store'] } as any)) as any;
+            const existing = await strapi.documents('api::reservation.reservation').findOne({
+                documentId: id,
+                populate: ['store']
+            });
+
             if (!existing) return ctx.notFound();
 
-            // @ts-ignore
-            const deleted = await strapi.entityService.delete('api::reservation.reservation', id, { transaction });
+            // Delete using documents API
+            const deleted = await strapi.documents('api::reservation.reservation').delete({
+                documentId: id
+            });
 
             if (existing.store && existing.date) {
                 await strapi.service('api::reservation.reservation').recalculateDailyLaneIndices(

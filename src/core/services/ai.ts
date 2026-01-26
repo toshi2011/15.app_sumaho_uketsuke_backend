@@ -37,26 +37,32 @@ export const AiService = {
     },
 
     /**
-     * 備考欄の重要度判定（特化メソッド）
+     * 備考欄の重要度判定 ＆ 顧客情報抽出
      * タイムアウトエラー時は安全策として true (要確認) を返す
      */
-    async classifyNote(note: string): Promise<{ requiresAction: boolean; reason?: string }> {
-        if (!note || !note.trim()) return { requiresAction: false };
+    async classifyNote(note: string): Promise<{ requiresAction: boolean; reason?: string; customerTrait?: string | null }> {
+        if (!note || !note.trim()) return { requiresAction: false, customerTrait: null };
 
         // プロンプトインジェクション対策: デリミタで囲む
         const prompt = `
-      あなたはレストランの予約管理AIです。
-      客の要望が「店側の特別な対応や確認が必要なもの」か「単なる挨拶や報告」か判定してください。
+      あなたはレストランの予約管理AIです。客のコメントを分析してください。
+
+      【タスク】
+      1. 店側の特別な対応や確認が必要か判定せよ ("requiresAction")
+      2. その理由を短く述べよ ("reason")
+      3. **顧客プロフィールとして長期保存すべき重要な情報**（アレルギー、記念日、好き嫌い、子供の有無など）があれば抽出せよ ("customerTrait")
+         - 保存すべき情報がない場合は null にせよ
+         - "楽しみにしています" などの挨拶は保存不要
+         - "結婚記念日です" -> "結婚記念日(1/25)" のように抽象化して抽出
       
-      出力は JSON 形式で { "requiresAction": true, "reason": "理由" } のように返してください。
-      reasonは店主への短い説明です（例: "アレルギー対応が必要なため"）。
+      出力は JSON 形式のみ: { "requiresAction": boolean, "reason": string, "customerTrait": string | null }
 
       例:
-      "卵アレルギーです" -> { "requiresAction": true, "reason": "食物アレルギー報告あり" }
-      "窓際希望" -> { "requiresAction": true, "reason": "座席指定の要望あり" }
-      "駐車場はありますか" -> { "requiresAction": true, "reason": "施設に関する質問あり" }
-      "楽しみにしています" -> { "requiresAction": false, "reason": "挨拶のみ" }
-      "結婚記念日です" -> { "requiresAction": false, "reason": "通常の祝事報告" }
+      "卵アレルギーです" -> { "requiresAction": true, "reason": "アレルギー対応", "customerTrait": "アレルギー: 卵" }
+      "窓際希望" -> { "requiresAction": true, "reason": "座席指定", "customerTrait": "座席好み: 窓際" }
+      "駐車場はありますか" -> { "requiresAction": true, "reason": "質問あり", "customerTrait": null }
+      "楽しみにしています" -> { "requiresAction": false, "reason": "挨拶", "customerTrait": null }
+      "結婚記念日です" -> { "requiresAction": false, "reason": "祝事報告", "customerTrait": "記念日: 結婚記念日" }
 
       客のコメント:
       """
@@ -70,12 +76,13 @@ export const AiService = {
             const data = JSON.parse(jsonText);
             return {
                 requiresAction: data.requiresAction === true,
-                reason: data.reason || ""
+                reason: data.reason || "",
+                customerTrait: data.customerTrait || null
             };
         } catch (error) {
             console.error("AiService.classifyNote Error/Timeout:", error);
             // エラー時は安全側に倒して「要確認」とする
-            return { requiresAction: true, reason: "AI判定エラー/タイムアウトのため安全策として要確認に設定" };
+            return { requiresAction: true, reason: "AI判定エラー/タイムアウトのため安全策として要確認に設定", customerTrait: null };
         }
     },
 
@@ -104,6 +111,59 @@ export const AiService = {
         } catch (error) {
             console.error("AiService.generateStandard Error:", error);
             return "生成に失敗しました。";
+        }
+    },
+
+    /**
+     * メッセージ翻訳（店主↔客の多言語対応）
+     * Gemini 2.5 Flash-lite を使用、タイムアウト: 5秒
+     * @param text - 翻訳対象テキスト
+     * @param targetLanguage - 翻訳先言語 (例: "English", "Korean", "Japanese")
+     */
+    async translateMessage(text: string, targetLanguage: string): Promise<string> {
+        if (!API_KEY) {
+            console.warn("AiService: No API Key. Returning original text.");
+            return text;
+        }
+
+        if (!text || !text.trim()) {
+            return "";
+        }
+
+        const modelName = process.env.AI_MODEL_TRANSLATE || process.env.AI_MODEL_LITE || "gemini-1.5-flash-8b";
+        const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: {
+                responseMimeType: "text/plain",
+                maxOutputTokens: 500
+            }
+        });
+
+        const prompt = `
+あなたは飲食店の店主とお客様の間のコミュニケーションをサポートする翻訳者です。
+以下のテキストを、飲食店の接客に相応しい丁寧な ${targetLanguage} に翻訳してください。
+
+【ルール】
+- 出力は翻訳結果のテキストのみを返してください
+- 敬語・丁寧語を維持してください
+- 店名や住所などの固有名詞はそのまま残してください
+
+【翻訳対象テキスト】
+"""
+${text}
+"""
+`;
+
+        try {
+            const result = await Promise.race([
+                model.generateContent(prompt),
+                new Promise<any>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000))
+            ]);
+
+            return result.response.text().trim();
+        } catch (error) {
+            console.error("AiService.translateMessage Error:", error);
+            throw error;
         }
     }
 };

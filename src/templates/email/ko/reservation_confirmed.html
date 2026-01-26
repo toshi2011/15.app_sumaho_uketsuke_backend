@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="ko">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ご予約が確定しました</title>
+    <title>예약 확정</title>
     <style>
         body {
             font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
@@ -36,14 +36,18 @@
             margin: 0;
         }
 
-        .status-badge {
-            display: inline-block;
+        .confirmation-box {
             background-color: #4CAF50;
             color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: bold;
-            margin: 15px 0;
+            text-align: center;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 25px 0;
+        }
+
+        .confirmation-box h2 {
+            margin: 0;
+            font-size: 20px;
         }
 
         .reservation-details {
@@ -108,20 +112,6 @@
             color: #f57c00;
         }
 
-        .confirmation-box {
-            background-color: #4CAF50;
-            color: white;
-            text-align: center;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 25px 0;
-        }
-
-        .confirmation-box h2 {
-            margin: 0;
-            font-size: 20px;
-        }
-
         .note {
             font-size: 14px;
             color: #666;
@@ -169,81 +159,64 @@
         <div class="header">
             <h1>{{store.name}}</h1>
         </div>
-
-        <p>{{reservation.name}} 様</p>
-
+        <p>{{reservation.name}} 님</p>
         <div class="confirmation-box">
-            <h2>✅ ご予約が確定しました</h2>
+            <h2>✅ 예약이 확정되었습니다</h2>
         </div>
-
-        <p>ご予約いただきありがとうございます。下記の内容で予約が確定いたしました。</p>
-
+        <p>예약해 주셔서 감사합니다. 아래와 같이 예약이 확정되었습니다.</p>
         <div class="reservation-number">
-            予約番号: {{reservation.reservationNumber}}
+            예약 번호: {{reservation.reservationNumber}}
         </div>
-
         <div class="reservation-details">
             <table>
                 <tr>
-                    <td>日付</td>
+                    <td>날짜</td>
                     <td><strong>{{reservation.dateFormatted}}</strong></td>
                 </tr>
                 <tr>
-                    <td>時間</td>
+                    <td>시간</td>
                     <td><strong>{{reservation.time}}</strong></td>
                 </tr>
                 <tr>
-                    <td>人数</td>
-                    <td><strong>{{reservation.guests}}名様</strong></td>
+                    <td>인원</td>
+                    <td><strong>{{reservation.guests}}명</strong></td>
                 </tr>
-                {{#if reservation.course}}
-                <tr>
-                    <td>コース</td>
+                {{#if reservation.course}}<tr>
+                    <td>코스</td>
                     <td>{{reservation.course}}</td>
-                </tr>
-                {{/if}}
+                </tr>{{/if}}
             </table>
         </div>
-
         {{#if reservation.assignedTablesText}}
-        <div class="table-info">
-            🪑 お席: <strong>{{reservation.assignedTablesText}}</strong>
-        </div>
+        <div class="table-info">🪑 좌석: <strong>{{reservation.assignedTablesText}}</strong></div>
         {{/if}}
-
         {{#if reservation.ownerReply}}
         <div class="owner-message">
-            <h4>💬 店舗からのメッセージ</h4>
+            <h4>💬 매장 메시지</h4>
             <p>{{reservation.ownerReply}}</p>
         </div>
         {{/if}}
-
         <div class="note">
-            <strong>📌 ご来店時のお願い</strong>
+            <strong>📌 주의사항</strong>
             <ul>
-                <li>ご予約時間の5分前までにお越しください</li>
-                <li>ご予約番号をお伝えいただくとスムーズです</li>
-                <li>キャンセル・変更の場合は事前にご連絡ください</li>
+                <li>예약 시간 5분 전까지 도착해 주십시오.</li>
+                <li>도착 시 예약 번호를 말씀해 주시면 원활합니다.</li>
+                <li>취소나 변경 시 사전에 연락 주십시오.</li>
             </ul>
         </div>
-
         <div class="store-info">
-            <h3>店舗情報</h3>
+            <h3>매장 정보</h3>
             <p>
                 {{store.name}}<br>
                 {{#if store.address}}📍 {{store.address}}<br>{{/if}}
                 {{#if store.phoneNumber}}📞 {{store.phoneNumber}}{{/if}}
             </p>
         </div>
-
         {{#if cancellationUrl}}
-        <div class="cancel-link">
-            <a href="{{cancellationUrl}}">キャンセルはこちら</a>
-        </div>
+        <div class="cancel-link"><a href="{{cancellationUrl}}">예약 취소는 여기를 클릭하세요</a></div>
         {{/if}}
-
         <div class="footer">
-            <p>このメールは {{store.name}} の予約システムから自動送信されています。</p>
+            <p>이 메일은 {{store.name}} 예약 시스템에서 자동 발송되었습니다.</p>
             <p>&copy; {{currentYear}} {{store.name}}</p>
         </div>
     </div>

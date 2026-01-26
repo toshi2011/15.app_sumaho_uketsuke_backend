@@ -101,10 +101,12 @@ export default {
                         status: r.status,
                         course: r.course,
                         notes: r.notes,
+                        notesTranslation: r.notesTranslation, // Ticket-10
                         ownerNote: r.ownerNote,
                         ownerReply: r.ownerReply,
                         requiresAttention: r.requiresAttention,
                         isOwnerEntry: r.isOwnerEntry,
+                        language: r.language, // Fix: Expose language field
                         assignedTables: r.assignedTables?.map((t: any) => ({
                             id: t.id, // Numeric ID
                             documentId: t.documentId, // Document ID
@@ -178,6 +180,7 @@ export default {
                     status: reservation.status,
                     course: reservation.course,
                     notes: reservation.notes,
+                    notesTranslation: reservation.notesTranslation, // Ticket-10
                     ownerNote: reservation.ownerNote,
                     ownerReply: reservation.ownerReply,
                     requiresAttention: reservation.requiresAttention,

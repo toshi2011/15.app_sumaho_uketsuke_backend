@@ -235,6 +235,12 @@
             "relation": "oneToMany",
             "target": "api::table.table",
             "mappedBy": "store"
+        },
+        "supportedLanguages": {
+            "type": "json",
+            "default": [
+                "ja"
+            ]
         }
     }
 }

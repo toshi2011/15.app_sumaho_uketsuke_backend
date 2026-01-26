@@ -119,6 +119,40 @@
         },
         "aiAdvice": {
             "type": "text"
+        },
+        "language": {
+            "type": "string",
+            "default": "ja"
+        },
+        "cancelToken": {
+            "type": "string"
+        },
+        "cancelReason": {
+            "type": "string"
+        },
+        "cancelledAt": {
+            "type": "datetime"
+        },
+        "notesTranslation": {
+            "type": "text"
+        },
+        "ownerReply": {
+            "type": "text"
+        },
+        "ownerReplyTranslated": {
+            "type": "text"
+        },
+        "emailStatus": {
+            "type": "enumeration",
+            "enum": [
+                "pending",
+                "sent",
+                "failed"
+            ],
+            "default": "pending"
+        },
+        "emailError": {
+            "type": "text"
         }
     }
 }

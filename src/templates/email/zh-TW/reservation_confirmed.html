@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="zh-TW">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ご予約が確定しました</title>
+    <title>預約已確認</title>
     <style>
         body {
             font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
@@ -170,22 +170,22 @@
             <h1>{{store.name}}</h1>
         </div>
 
-        <p>{{reservation.name}} 様</p>
+        <p>{{reservation.name}} 您好</p>
 
         <div class="confirmation-box">
-            <h2>✅ ご予約が確定しました</h2>
+            <h2>✅ 預約已確認</h2>
         </div>
 
-        <p>ご予約いただきありがとうございます。下記の内容で予約が確定いたしました。</p>
+        <p>感謝您的預約。您的預約已確認如下。</p>
 
         <div class="reservation-number">
-            予約番号: {{reservation.reservationNumber}}
+            預約編號: {{reservation.reservationNumber}}
         </div>
 
         <div class="reservation-details">
             <table>
                 <tr>
-                    <td>日付</td>
+                    <td>日期</td>
                     <td><strong>{{reservation.dateFormatted}}</strong></td>
                 </tr>
                 <tr>
@@ -193,12 +193,12 @@
                     <td><strong>{{reservation.time}}</strong></td>
                 </tr>
                 <tr>
-                    <td>人数</td>
-                    <td><strong>{{reservation.guests}}名様</strong></td>
+                    <td>人數</td>
+                    <td><strong>{{reservation.guests}}位</strong></td>
                 </tr>
                 {{#if reservation.course}}
                 <tr>
-                    <td>コース</td>
+                    <td>套餐</td>
                     <td>{{reservation.course}}</td>
                 </tr>
                 {{/if}}
@@ -207,28 +207,28 @@
 
         {{#if reservation.assignedTablesText}}
         <div class="table-info">
-            🪑 お席: <strong>{{reservation.assignedTablesText}}</strong>
+            🪑 座位: <strong>{{reservation.assignedTablesText}}</strong>
         </div>
         {{/if}}
 
         {{#if reservation.ownerReply}}
         <div class="owner-message">
-            <h4>💬 店舗からのメッセージ</h4>
+            <h4>💬 店鋪訊息</h4>
             <p>{{reservation.ownerReply}}</p>
         </div>
         {{/if}}
 
         <div class="note">
-            <strong>📌 ご来店時のお願い</strong>
+            <strong>📌 注意事項</strong>
             <ul>
-                <li>ご予約時間の5分前までにお越しください</li>
-                <li>ご予約番号をお伝えいただくとスムーズです</li>
-                <li>キャンセル・変更の場合は事前にご連絡ください</li>
+                <li>請在預約時間前5分鐘到達</li>
+                <li>請告知預約編號以便順利入座</li>
+                <li>若需取消或更改，請提前聯繫</li>
             </ul>
         </div>
 
         <div class="store-info">
-            <h3>店舗情報</h3>
+            <h3>店鋪資訊</h3>
             <p>
                 {{store.name}}<br>
                 {{#if store.address}}📍 {{store.address}}<br>{{/if}}
@@ -238,12 +238,12 @@
 
         {{#if cancellationUrl}}
         <div class="cancel-link">
-            <a href="{{cancellationUrl}}">キャンセルはこちら</a>
+            <a href="{{cancellationUrl}}">取消預約請點擊此處</a>
         </div>
         {{/if}}
 
         <div class="footer">
-            <p>このメールは {{store.name}} の予約システムから自動送信されています。</p>
+            <p>本郵件由 {{store.name}} 預約系統自動發送。</p>
             <p>&copy; {{currentYear}} {{store.name}}</p>
         </div>
     </div>

@@ -6,7 +6,6 @@
 // afterCreate後にメールが送信済みである予約を追跡する
 // afterUpdateからの重複送信を防ぐため
 const emailAlreadySentForCreate = new Set<number>();
-// const emailAlreadySentForCreate = new Set<number>(); // This line is removed as per the instruction
 
 // Email deduplication history for afterUpdate
 // Key: `${reservationId}:${status}`
@@ -19,7 +18,6 @@ const emailSentSession = new Set<string>();
 export default {
     async afterCreate(event) {
         const { result } = event;
-        // console.log(`[Lifecycle:afterCreate] ID=${result.id} Status=${result.status}`);
         strapi.log.info(`[Lifecycle:afterCreate] ID=${result.id} Status=${result.status}`);
 
         // [Prevention] Double execution guard
@@ -76,34 +74,52 @@ export default {
             }
 
             // ステータスに応じてメール送信
+            let emailResult: any = null;
+
             if (result.status === 'pending') {
                 console.log(`[Lifecycle:afterCreate] Sending PENDING email for ${result.id}`);
                 // 仮受付メール
-                await strapi.service('api::reservation.email').sendReservationEmail(
+                emailResult = await strapi.service('api::reservation.email').sendReservationEmail(
                     reservationWithStore,
                     store,
                     'pending'
                 );
-                strapi.log.info(`[Lifecycle:afterCreate] Pending email sent for reservation ${result.id}`);
-                // Mark this reservation as having email sent
+
+                // Mark this reservation as having email sent (attempted)
                 emailAlreadySentForCreate.add(result.id);
-                // Also add to debounce history
                 const dedupKey = `${result.id}:pending`;
                 emailSentHistory.set(dedupKey, Date.now());
+
             } else if (result.status === 'confirmed') {
                 console.log(`[Lifecycle:afterCreate] Sending CONFIRMED email for ${result.id} (auto-approved)`);
                 // 自動確定の場合は確定メール
-                await strapi.service('api::reservation.email').sendReservationEmail(
+                emailResult = await strapi.service('api::reservation.email').sendReservationEmail(
                     reservationWithStore,
                     store,
                     'confirmed'
                 );
-                strapi.log.info(`[Lifecycle:afterCreate] Confirmation email sent for auto-approved reservation ${result.id}`);
+
                 // Mark this reservation as having email sent
                 emailAlreadySentForCreate.add(result.id);
-                // Also add to debounce history to protect against immediate updates
                 const dedupKey = `${result.id}:confirmed`;
                 emailSentHistory.set(dedupKey, Date.now());
+            }
+
+            // DBにステータスを保存 (Logging)
+            if (emailResult) {
+                const emailStatus = emailResult.success ? 'sent' : 'failed';
+                const emailError = emailResult.error || null;
+
+                if (!emailResult.success) {
+                    strapi.log.error(`[Lifecycle:afterCreate] Email failed for ${result.id}: ${emailError}`);
+                } else {
+                    strapi.log.info(`[Lifecycle:afterCreate] Email sent for ${result.id}`);
+                }
+
+                await strapi.db.query('api::reservation.reservation').update({
+                    where: { id: result.id },
+                    data: { emailStatus, emailError }
+                });
             }
         } catch (error) {
             console.error('[Lifecycle:afterCreate] Error:', error);
@@ -183,24 +199,74 @@ export default {
 
             // ステータスに応じてメール送信
             let sent = false;
+            let emailResult: any = null;
+
+            // 返信の自動翻訳 (Ticket-10)
+            let ownerReplyTranslated = null;
+
+            // Debug Log for Translation
+            if (params.data.ownerReply) {
+                strapi.log.info(`[Lifecycle:afterUpdate] Translation check: OwnerReply present. Language=${reservationWithStore.language}`);
+            }
+
+            if (params.data.ownerReply && reservationWithStore.language && reservationWithStore.language !== 'ja') {
+                try {
+                    const AiService = require('../../../../core/services/ai').AiService;
+                    // 言語コードマップ (ISO -> Language Name)
+                    const langMap: Record<string, string> = {
+                        'en': 'English',
+                        'ko': 'Korean',
+                        'zh-CN': 'Simplified Chinese',
+                        'zh-TW': 'Traditional Chinese'
+                    };
+                    const targetLang = langMap[reservationWithStore.language] || 'English';
+
+                    strapi.log.info(`[Lifecycle:afterUpdate] Attempting translation to ${targetLang}...`);
+                    ownerReplyTranslated = await AiService.translateMessage(params.data.ownerReply, targetLang);
+                    strapi.log.info(`[Lifecycle:afterUpdate] Owner reply translated: ${ownerReplyTranslated}`);
+                } catch (e) {
+                    strapi.log.error('[Lifecycle:afterUpdate] Owner reply translation failed:', e);
+                }
+            }
+
+            // 翻訳結果をreservationオブジェクトに注入
+            if (ownerReplyTranslated) {
+                (reservationWithStore as any).ownerReplyTranslated = ownerReplyTranslated;
+            }
+
             if (newStatus === 'confirmed') {
                 console.log(`[Lifecycle:afterUpdate] Sending CONFIRMED email for ${result.id}`);
-                await strapi.service('api::reservation.email').sendReservationEmail(
+                emailResult = await strapi.service('api::reservation.email').sendReservationEmail(
                     reservationWithStore,
                     store,
                     'confirmed'
                 );
-                strapi.log.info(`[Lifecycle:afterUpdate] Confirmation email sent for reservation ${result.id}`);
                 sent = true;
             } else if (newStatus === 'rejected' || newStatus === 'cancelled') {
                 console.log(`[Lifecycle:afterUpdate] Sending CANCELLED email for ${result.id}`);
-                await strapi.service('api::reservation.email').sendReservationEmail(
+                emailResult = await strapi.service('api::reservation.email').sendReservationEmail(
                     reservationWithStore,
                     store,
                     'cancelled'
                 );
-                strapi.log.info(`[Lifecycle:afterUpdate] Cancellation email sent for reservation ${result.id}`);
                 sent = true;
+            }
+
+            // DBにステータスを保存 (Logging)
+            if (emailResult) {
+                const emailStatus = emailResult.success ? 'sent' : 'failed';
+                const emailError = emailResult.error || null;
+
+                if (!emailResult.success) {
+                    strapi.log.error(`[Lifecycle:afterUpdate] Email failed for ${result.id}: ${emailError}`);
+                } else {
+                    strapi.log.info(`[Lifecycle:afterUpdate] Email sent for ${result.id}`);
+                }
+
+                await strapi.db.query('api::reservation.reservation').update({
+                    where: { id: result.id },
+                    data: { emailStatus, emailError }
+                });
             }
 
             // Record timestamp if email was sent

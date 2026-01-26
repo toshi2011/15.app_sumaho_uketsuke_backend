@@ -611,6 +611,9 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
     aiAnalysisResult: Schema.Attribute.JSON;
     aiReason: Schema.Attribute.Text;
     assignedTables: Schema.Attribute.Relation<'manyToMany', 'api::table.table'>;
+    cancelledAt: Schema.Attribute.DateTime;
+    cancelReason: Schema.Attribute.String;
+    cancelToken: Schema.Attribute.String;
     confirmedAt: Schema.Attribute.DateTime;
     course: Schema.Attribute.String;
     createdAt: Schema.Attribute.DateTime;
@@ -620,6 +623,9 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
     date: Schema.Attribute.Date;
     duration: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<120>;
     email: Schema.Attribute.Email;
+    emailError: Schema.Attribute.Text;
+    emailStatus: Schema.Attribute.Enumeration<['pending', 'sent', 'failed']> &
+      Schema.Attribute.DefaultTo<'pending'>;
     endTime: Schema.Attribute.Time;
     guests: Schema.Attribute.Integer &
       Schema.Attribute.Required &
@@ -632,6 +638,7 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
     isOvernight: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     isRead: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     laneIndex: Schema.Attribute.Integer;
+    language: Schema.Attribute.String & Schema.Attribute.DefaultTo<'ja'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -640,7 +647,10 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     name: Schema.Attribute.String & Schema.Attribute.Required;
     notes: Schema.Attribute.Text;
+    notesTranslation: Schema.Attribute.Text;
     ownerNote: Schema.Attribute.Text;
+    ownerReply: Schema.Attribute.Text;
+    ownerReplyTranslated: Schema.Attribute.Text;
     phone: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
     requiresReview: Schema.Attribute.Boolean &
@@ -861,6 +871,8 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
       ['LEAD', 'CONTACTED', 'TRIAL', 'REJECTED', 'DORMANT', 'ACTIVE']
     > &
       Schema.Attribute.DefaultTo<'LEAD'>;
+    supportedLanguages: Schema.Attribute.JSON &
+      Schema.Attribute.DefaultTo<['ja']>;
     tables: Schema.Attribute.Relation<'oneToMany', 'api::table.table'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &

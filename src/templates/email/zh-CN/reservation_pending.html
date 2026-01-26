@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="zh-CN">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ご予約が確定しました</title>
+    <title>预约请求已收到</title>
     <style>
         body {
-            font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Microsoft YaHei', sans-serif;
             line-height: 1.8;
             color: #333;
             max-width: 600px;
@@ -38,7 +38,7 @@
 
         .status-badge {
             display: inline-block;
-            background-color: #4CAF50;
+            background-color: #FFA726;
             color: white;
             padding: 8px 16px;
             border-radius: 20px;
@@ -47,7 +47,7 @@
         }
 
         .reservation-details {
-            background-color: #e8f5e9;
+            background-color: #f9f9f9;
             border-left: 4px solid #4CAF50;
             padding: 20px;
             margin: 20px 0;
@@ -60,13 +60,13 @@
 
         .reservation-details td {
             padding: 10px 0;
-            border-bottom: 1px dashed #c8e6c9;
+            border-bottom: 1px dashed #ddd;
         }
 
         .reservation-details td:first-child {
             font-weight: bold;
             width: 100px;
-            color: #2e7d32;
+            color: #666;
         }
 
         .reservation-number {
@@ -78,48 +78,14 @@
             text-align: center;
             border-radius: 4px;
             margin-bottom: 20px;
-            border: 2px solid #4CAF50;
         }
 
-        .owner-message {
-            background-color: #e3f2fd;
-            border: 1px solid #64B5F6;
+        .message {
+            background-color: #fff3e0;
+            border: 1px solid #FFB74D;
             border-radius: 4px;
             padding: 15px;
             margin: 20px 0;
-        }
-
-        .owner-message h4 {
-            margin: 0 0 10px 0;
-            color: #1976D2;
-        }
-
-        .table-info {
-            background-color: #fff8e1;
-            border: 1px solid #FFD54F;
-            border-radius: 4px;
-            padding: 15px;
-            margin: 20px 0;
-            text-align: center;
-        }
-
-        .table-info strong {
-            font-size: 18px;
-            color: #f57c00;
-        }
-
-        .confirmation-box {
-            background-color: #4CAF50;
-            color: white;
-            text-align: center;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 25px 0;
-        }
-
-        .confirmation-box h2 {
-            margin: 0;
-            font-size: 20px;
         }
 
         .note {
@@ -128,15 +94,6 @@
             margin-top: 20px;
             padding-top: 20px;
             border-top: 1px solid #eee;
-        }
-
-        .footer {
-            text-align: center;
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #eee;
-            color: #888;
-            font-size: 12px;
         }
 
         .store-info {
@@ -152,13 +109,12 @@
             color: #333;
         }
 
-        .cancel-link {
+        .footer {
             text-align: center;
-            margin-top: 20px;
-        }
-
-        .cancel-link a {
-            color: #999;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #888;
             font-size: 12px;
         }
     </style>
@@ -170,65 +126,60 @@
             <h1>{{store.name}}</h1>
         </div>
 
-        <p>{{reservation.name}} 様</p>
+        <p>尊敬的 {{reservation.name}}：</p>
 
-        <div class="confirmation-box">
-            <h2>✅ ご予約が確定しました</h2>
-        </div>
+        <p>感谢您的预约请求。</p>
 
-        <p>ご予約いただきありがとうございます。下記の内容で予約が確定いたしました。</p>
+        <div class="status-badge">📋 等待确认</div>
+
+        <p>我们已收到您的预约请求。餐厅确认后会发送<strong>确认邮件</strong>给您。</p>
 
         <div class="reservation-number">
-            予約番号: {{reservation.reservationNumber}}
+            参考号: {{reservation.reservationNumber}}
         </div>
 
         <div class="reservation-details">
             <table>
                 <tr>
-                    <td>日付</td>
-                    <td><strong>{{reservation.dateFormatted}}</strong></td>
+                    <td>日期</td>
+                    <td>{{reservation.dateFormatted}}</td>
                 </tr>
                 <tr>
-                    <td>時間</td>
-                    <td><strong>{{reservation.time}}</strong></td>
+                    <td>时间</td>
+                    <td>{{reservation.time}}</td>
                 </tr>
                 <tr>
                     <td>人数</td>
-                    <td><strong>{{reservation.guests}}名様</strong></td>
+                    <td>{{reservation.guests}}位</td>
                 </tr>
                 {{#if reservation.course}}
                 <tr>
-                    <td>コース</td>
+                    <td>套餐</td>
                     <td>{{reservation.course}}</td>
                 </tr>
                 {{/if}}
             </table>
         </div>
 
-        {{#if reservation.assignedTablesText}}
-        <div class="table-info">
-            🪑 お席: <strong>{{reservation.assignedTablesText}}</strong>
-        </div>
-        {{/if}}
-
-        {{#if reservation.ownerReply}}
-        <div class="owner-message">
-            <h4>💬 店舗からのメッセージ</h4>
-            <p>{{reservation.ownerReply}}</p>
+        {{#if reservation.notes}}
+        <div class="message">
+            <strong>您的特殊要求：</strong><br>
+            {{reservation.notes}}
         </div>
         {{/if}}
 
         <div class="note">
-            <strong>📌 ご来店時のお願い</strong>
+            <strong>📌 温馨提示</strong>
             <ul>
-                <li>ご予約時間の5分前までにお越しください</li>
-                <li>ご予約番号をお伝えいただくとスムーズです</li>
-                <li>キャンセル・変更の場合は事前にご連絡ください</li>
+                <li>这是一封自动确认您请求的邮件</li>
+                <li>收到确认邮件后您的预约才正式生效</li>
+                <li>我们通常会在1个工作日内回复</li>
+                <li>如有紧急需求，请直接联系餐厅</li>
             </ul>
         </div>
 
         <div class="store-info">
-            <h3>店舗情報</h3>
+            <h3>餐厅信息</h3>
             <p>
                 {{store.name}}<br>
                 {{#if store.address}}📍 {{store.address}}<br>{{/if}}
@@ -236,14 +187,8 @@
             </p>
         </div>
 
-        {{#if cancellationUrl}}
-        <div class="cancel-link">
-            <a href="{{cancellationUrl}}">キャンセルはこちら</a>
-        </div>
-        {{/if}}
-
         <div class="footer">
-            <p>このメールは {{store.name}} の予約システムから自動送信されています。</p>
+            <p>此邮件由 {{store.name}} 预约系统自动发送。</p>
             <p>&copy; {{currentYear}} {{store.name}}</p>
         </div>
     </div>
