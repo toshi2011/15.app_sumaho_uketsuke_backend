@@ -12,10 +12,20 @@ const emailAlreadySentForCreate = new Set<number>();
 // Value: timestamp
 const emailSentHistory = new Map<string, number>();
 
+const { v4: uuidv4 } = require('uuid');
+
 // Global set to track email sent for specific ID (Session duration)
 const emailSentSession = new Set<string>();
 
 export default {
+    async beforeCreate(event) {
+        const { data } = event.params;
+        // キャンセル用トークンの生成
+        if (!data.cancelToken) {
+            data.cancelToken = uuidv4();
+        }
+    },
+
     async afterCreate(event) {
         const { result } = event;
         strapi.log.info(`[Lifecycle:afterCreate] ID=${result.id} Status=${result.status}`);
@@ -210,28 +220,36 @@ export default {
             }
 
             if (params.data.ownerReply && reservationWithStore.language && reservationWithStore.language !== 'ja') {
-                try {
-                    const AiService = require('../../../../core/services/ai').AiService;
-                    // 言語コードマップ (ISO -> Language Name)
-                    const langMap: Record<string, string> = {
-                        'en': 'English',
-                        'ko': 'Korean',
-                        'zh-CN': 'Simplified Chinese',
-                        'zh-TW': 'Traditional Chinese'
-                    };
-                    const targetLang = langMap[reservationWithStore.language] || 'English';
+                // Feature: Frontend might have already combined translation and original.
+                // Check if the message contains the separator (e.g., "---" or "(Original")
+                const replyText = params.data.ownerReply;
+                const isAlreadyCombined = replyText.includes('---') || replyText.includes('(Original');
 
-                    strapi.log.info(`[Lifecycle:afterUpdate] Attempting translation to ${targetLang}...`);
-                    ownerReplyTranslated = await AiService.translateMessage(params.data.ownerReply, targetLang);
-                    strapi.log.info(`[Lifecycle:afterUpdate] Owner reply translated: ${ownerReplyTranslated}`);
-                } catch (e) {
-                    strapi.log.error('[Lifecycle:afterUpdate] Owner reply translation failed:', e);
+                if (isAlreadyCombined) {
+                    strapi.log.info(`[Lifecycle:afterUpdate] Skipping translation - message appears to be already translated/combined.`);
+                } else {
+                    try {
+                        const { TranslationService } = require('../../../../core/services/translation');
+
+                        strapi.log.info(`[Lifecycle:afterUpdate] Attempting translation to ${reservationWithStore.language}...`);
+                        ownerReplyTranslated = await TranslationService.translate(params.data.ownerReply, reservationWithStore.language);
+                        strapi.log.info(`[Lifecycle:afterUpdate] Owner reply translated: ${ownerReplyTranslated}`);
+                    } catch (e) {
+                        strapi.log.error('[Lifecycle:afterUpdate] Owner reply translation failed:', e);
+                    }
                 }
             }
 
             // 翻訳結果をreservationオブジェクトに注入
             if (ownerReplyTranslated) {
                 (reservationWithStore as any).ownerReplyTranslated = ownerReplyTranslated;
+            }
+
+            // [Fix] Ensure the email uses the latest ownerReply from the update params
+            // DB fetch might sometimes miss the inflight update in certain transaction isolations
+            // or if the update specifically targeted ownerReply.
+            if (params.data.ownerReply) {
+                reservationWithStore.ownerReply = params.data.ownerReply;
             }
 
             if (newStatus === 'confirmed') {

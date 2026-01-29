@@ -13,8 +13,8 @@ export const AiService = {
             console.warn("AiService: No API Key. Returning empty string.");
             return "";
         }
-
         const modelName = process.env.AI_MODEL_LITE || "gemini-1.5-flash-8b";
+
         const model = genAI.getGenerativeModel({
             model: modelName,
             generationConfig: {
@@ -24,14 +24,15 @@ export const AiService = {
         });
 
         try {
+            // タイムアウトを 3000ms -> 10000ms に変更 (安全マージン確保)
             const result = await Promise.race([
                 model.generateContent(prompt),
-                new Promise<any>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3000))
+                new Promise<any>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 10000))
             ]);
 
             return result.response.text();
         } catch (error) {
-            console.error("AiService.generateLite Error:", error);
+            console.error(`AiService.generateLite Error (Model: ${modelName}):`, error);
             throw error;
         }
     },
@@ -74,15 +75,21 @@ export const AiService = {
             // JSONモードで呼び出し
             const jsonText = await this.generateLite(prompt, true);
             const data = JSON.parse(jsonText);
-            return {
+
+            const result = {
                 requiresAction: data.requiresAction === true,
                 reason: data.reason || "",
                 customerTrait: data.customerTrait || null
             };
+
+            // 成功ログ (デバッグ用)
+            console.log(`[AiService] Classify Success: Action=${result.requiresAction}, Reason=${result.reason}`);
+
+            return result;
         } catch (error) {
             console.error("AiService.classifyNote Error/Timeout:", error);
             // エラー時は安全側に倒して「要確認」とする
-            return { requiresAction: true, reason: "AI判定エラー/タイムアウトのため安全策として要確認に設定", customerTrait: null };
+            return { requiresAction: true, reason: `AI判定エラー/タイムアウトのため安全策として要確認に設定: ${error instanceof Error ? error.message : String(error)}`, customerTrait: null };
         }
     },
 
@@ -114,56 +121,6 @@ export const AiService = {
         }
     },
 
-    /**
-     * メッセージ翻訳（店主↔客の多言語対応）
-     * Gemini 2.5 Flash-lite を使用、タイムアウト: 5秒
-     * @param text - 翻訳対象テキスト
-     * @param targetLanguage - 翻訳先言語 (例: "English", "Korean", "Japanese")
-     */
-    async translateMessage(text: string, targetLanguage: string): Promise<string> {
-        if (!API_KEY) {
-            console.warn("AiService: No API Key. Returning original text.");
-            return text;
-        }
-
-        if (!text || !text.trim()) {
-            return "";
-        }
-
-        const modelName = process.env.AI_MODEL_TRANSLATE || process.env.AI_MODEL_LITE || "gemini-1.5-flash-8b";
-        const model = genAI.getGenerativeModel({
-            model: modelName,
-            generationConfig: {
-                responseMimeType: "text/plain",
-                maxOutputTokens: 500
-            }
-        });
-
-        const prompt = `
-あなたは飲食店の店主とお客様の間のコミュニケーションをサポートする翻訳者です。
-以下のテキストを、飲食店の接客に相応しい丁寧な ${targetLanguage} に翻訳してください。
-
-【ルール】
-- 出力は翻訳結果のテキストのみを返してください
-- 敬語・丁寧語を維持してください
-- 店名や住所などの固有名詞はそのまま残してください
-
-【翻訳対象テキスト】
-"""
-${text}
-"""
-`;
-
-        try {
-            const result = await Promise.race([
-                model.generateContent(prompt),
-                new Promise<any>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000))
-            ]);
-
-            return result.response.text().trim();
-        } catch (error) {
-            console.error("AiService.translateMessage Error:", error);
-            throw error;
-        }
-    }
+    // 【削除】翻訳機能は TranslationService へ移動したため削除
+    // async translateMessage(...) { ... }  <-- 削除
 };

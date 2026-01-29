@@ -3,7 +3,8 @@
  * Ticket-03: AI翻訳返信フロー
  */
 
-import { AiService } from '../../../core/services/ai';
+// import { AiService } from '../../../core/services/ai';
+import { TranslationService } from '../../../core/services/translation';
 
 export default {
     async translate(ctx) {
@@ -15,7 +16,8 @@ export default {
         }
 
         try {
-            const translatedText = await AiService.translateMessage(text, targetLanguage);
+            // Google Cloud Translation を使用
+            const translatedText = await TranslationService.translate(text, targetLanguage);
             ctx.body = {
                 success: true,
                 translatedText

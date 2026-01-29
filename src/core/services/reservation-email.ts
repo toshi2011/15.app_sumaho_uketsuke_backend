@@ -39,9 +39,9 @@ const createTransporter = () => {
 const loadTemplate = (templateName: string, language: string = 'ja'): handlebars.TemplateDelegate | null => {
     const cacheKey = `${language}/${templateName}`;
 
-    if (templateCache.has(cacheKey)) {
-        return templateCache.get(cacheKey)!;
-    }
+    // if (templateCache.has(cacheKey)) {
+    //     return templateCache.get(cacheKey)!;
+    // }
 
     const templatePath = path.join(
         process.cwd(),
@@ -157,14 +157,32 @@ export default () => ({
             ? `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reservation/cancel/${reservation.cancelToken}?lang=${language}`
             : '';
 
-        // 店主返信の翻訳がある場合は、それをownerReplyとして上書き（または併記）して表示
         // lifecycles.ts から ownerReplyTranslated が渡されてくる想定
         let ownerReplyDisplay = reservation.ownerReply;
-        if (reservation.ownerReplyTranslated) {
-            // UIでは原文も表示したいかもしれないが、メールでは相手の言語を優先
-            // フォーマット: "Translated Text\n\n(Original: ...)"
-            ownerReplyDisplay = `${reservation.ownerReplyTranslated}\n\n(Original Message:\n${reservation.ownerReply})`;
+
+        // Frontend (ReservationDetailModal) might have already combined translation and original.
+        // Check if we need to combine them here.
+        if (reservation.ownerReplyTranslated && reservation.ownerReply) {
+            // If the ownerReply already contains the translation (simple check), don't append.
+            // Or safer: If ownerReply is substantially longer than translation, assume it's combined?
+            // Best approach: If frontend functionality is sending combined text, backend should trust it.
+            // But we need to support cases where translation happens purely on backend too?
+            // Given the bug report "Duplicate", let's assume if ownerReply contains the translated text, we skip.
+
+            // Simple duplicate check: if ownerReply includes the translated text, use ownerReply as is.
+            if (reservation.ownerReply.includes(reservation.ownerReplyTranslated)) {
+                ownerReplyDisplay = reservation.ownerReply;
+            } else {
+                // Format: "Translated Text\n\n(Original: ...)"
+                ownerReplyDisplay = `${reservation.ownerReplyTranslated}\n\n(Original Message:\n${reservation.ownerReply})`;
+            }
+        } else if (reservation.ownerReplyTranslated) {
+            ownerReplyDisplay = reservation.ownerReplyTranslated;
         }
+
+        // Debug Log
+        strapi.log.info(`${logPrefix} Cancellation URL generated: ${cancellationUrl}`);
+        strapi.log.info(`${logPrefix} OwnerReply check: Raw='${reservation.ownerReply}', Translated='${reservation.ownerReplyTranslated}', Display='${ownerReplyDisplay}'`);
 
         const variables = {
             reservation: {
@@ -180,6 +198,9 @@ export default () => ({
             currentYear: new Date().getFullYear(),
             cancellationUrl,
         };
+
+        strapi.log.info(`${logPrefix} Template Variables: ownerReply='${variables.reservation.ownerReply}', cancellationUrl='${variables.cancellationUrl}'`);
+
         const html = template(variables);
         const transporter = createTransporter();
 

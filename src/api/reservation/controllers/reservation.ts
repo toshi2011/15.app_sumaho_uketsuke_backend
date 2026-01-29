@@ -58,7 +58,7 @@ export default factories.createCoreController('api::reservation.reservation', ({
                 }
 
                 if (customer) {
-                    linkedCustomerId = customer.id;
+                    linkedCustomerId = customer.documentId;
                     linkedCustomerData = customer;
                     strapi.log.info(`[Reservation] Pre-linked Customer: ID=${customer.id}`);
 
@@ -136,6 +136,7 @@ export default factories.createCoreController('api::reservation.reservation', ({
                                 data.aiReason = aiResult.reason;
                                 aiRequiresAction = aiResult.requiresAction;
                                 strapi.log.info(`[Reservation] AI Classify: Action=${aiRequiresAction}, Reason=${aiResult.reason}, Trait=${aiResult.customerTrait}`);
+                                console.log(`[Reservation] AI Classify Result: Action=${aiRequiresAction}, Reason=${aiResult.reason}, Trait=${aiResult.customerTrait}`);
 
                                 // Ticket-AI-05: Auto-Transcription to Customer Note
                                 if (aiResult.customerTrait && linkedCustomerId) {
@@ -168,6 +169,7 @@ export default factories.createCoreController('api::reservation.reservation', ({
                                                 }
                                             });
                                             strapi.log.info(`[Reservation] Auto-Transcribed trait to Customer ${linkedCustomerId}`);
+                                            console.log(`[Reservation] Auto-Transcription Success: Customer=${linkedCustomerId}, Trait=${aiResult.customerTrait}`);
                                         }
                                     } catch (traitErr) {
                                         strapi.log.error('[Reservation] Auto-Transcription Error:', traitErr);
@@ -184,9 +186,9 @@ export default factories.createCoreController('api::reservation.reservation', ({
                         // Ticket-AI-03: CRM Advice (Using pre-calculated context)
                         if (data.phone) {
                             try {
-                                // If there is context or current notes, generate advice
-                                // Use customerContextText prepared outside
-                                if (customerContextText || (data.notes && data.notes.trim())) {
+                                // FEAT-AI-01: Skip advice if no past context (first time customer)
+                                console.log(`[Reservation] AI Advice Check: Customer=${linkedCustomerId}, ContextLength=${customerContextText ? customerContextText.length : 0}, Context=${customerContextText ? customerContextText.replace(/\n/g, ' ') : 'null'}`);
+                                if (customerContextText && linkedCustomerId) {
                                     const advicePrompt = `
                                       あなたはレストランの店主をサポートするAIです。
                                       過去の顧客情報と今回の要望から、店主への接客アドバイスを生成してください。
@@ -196,9 +198,11 @@ export default factories.createCoreController('api::reservation.reservation', ({
                                       
                                       出力はアドバイスのテキストのみ（簡潔に一言二言で）。
                                     `;
-                                    const advice = await AiService.generateLite(advicePrompt);
+                                    // Use Standard model for Advice to avoid Lite rate limits and for better quality
+                                    const advice = await AiService.generateStandard(advicePrompt);
                                     data.aiAdvice = advice;
                                     strapi.log.info(`[Reservation] AI Advice Generated.`);
+                                    console.log(`[Reservation] AI Advice Generated: ${advice.substring(0, 30)}...`);
                                 }
                             } catch (e) {
                                 strapi.log.error(`[Reservation] AI Advice Error:`, e);
@@ -355,6 +359,8 @@ export default factories.createCoreController('api::reservation.reservation', ({
                     populate: ['store', 'assignedTables']
                 });
 
+
+
                 // 4. Recalculate Lanes (Ticket 02)
                 if (data.store && data.date) {
                     await strapi.service('api::reservation.reservation').recalculateDailyLaneIndices(
@@ -481,5 +487,93 @@ export default factories.createCoreController('api::reservation.reservation', ({
     },
     async findOne(ctx) {
         return await super.findOne(ctx);
+    },
+
+    // Ticket-06: Web Cancellation (Public)
+    async getReservationByToken(ctx) {
+        const { token } = ctx.params;
+
+        if (!token) return ctx.badRequest('Token is required');
+
+        const reservation = await strapi.db.query('api::reservation.reservation').findOne({
+            where: { cancelToken: token },
+            populate: ['store', 'assignedTables']
+        });
+
+        if (!reservation) {
+            return ctx.notFound('Reservation not found by token');
+        }
+
+        if (reservation.status === 'cancelled') {
+            return ctx.badRequest('Already cancelled');
+        }
+
+        // Return safe public info only
+        return {
+            id: reservation.documentId, // Access by documentId internally if needed
+            reservationNumber: reservation.reservationNumber,
+            date: reservation.date,
+            time: reservation.time,
+            guests: reservation.guests,
+            storeName: reservation.store?.name,
+            customerName: reservation.name, // To show "Hello, [Name]"
+            status: reservation.status
+        };
+    },
+
+    async execCancel(ctx) {
+        const { cancelToken, reason } = ctx.request.body;
+
+        if (!cancelToken) return ctx.badRequest('cancelToken is required');
+
+        return await strapi.db.transaction(async (transaction) => {
+            const reservation = await strapi.db.query('api::reservation.reservation').findOne({
+                where: { cancelToken },
+                populate: ['store']
+            });
+
+            if (!reservation) {
+                return ctx.notFound('Reservation not found');
+            }
+
+            if (reservation.status === 'canceled') {
+                return ctx.badRequest('Already cancelled');
+            }
+
+            // Update status
+            const updated = await strapi.documents('api::reservation.reservation').update({
+                documentId: reservation.documentId,
+                data: {
+                    status: 'canceled',
+                    cancelReason: reason || 'User Web Cancellation',
+                    cancelledAt: new Date().toISOString(),
+                    // Ensure ownerReply is updated so lifecycle sends email with reason if needed?
+                    // Actually lifecycle uses ownerReply from params.data as per our fix.
+                    // But here we are client -> server.
+                    // If we want the reason in the email to the owner, we might need to put it somewhere?
+                    // Lifecycle logs `emailResult` based on updated data.
+                },
+                status: 'published'
+            });
+
+            // Note: recalculateDailyLaneIndices?
+            // "Cancelled" reservations are ignored by lane logic usually,
+            // but if we want to redraw timeline, yes we might need to update.
+            // But timeline is read-status dependent.
+            // Let's safe-call recalculate for consistency.
+            if (reservation.store && reservation.date) {
+                await strapi.service('api::reservation.reservation').recalculateDailyLaneIndices(
+                    reservation.store.documentId,
+                    reservation.date,
+                    transaction
+                );
+            }
+
+            return {
+                success: true,
+                message: 'Reservation cancelled successfully',
+                reservationId: (updated as any).reservationNumber || updated.documentId
+            };
+        });
     }
 }));

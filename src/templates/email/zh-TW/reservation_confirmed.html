@@ -237,13 +237,37 @@
         </div>
 
         {{#if cancellationUrl}}
-        <div class="cancel-link">
-            <a href="{{cancellationUrl}}">取消預約請點擊此處</a>
+        <div class="confirmation-box"
+            style="background-color: #fff0f5; border: 1px dashed #ff69b4; color: #333; margin-top: 30px;">
+            <h3 style="color: #d81b60; margin: 0 0 10px 0;">行程有變嗎？</h3>
+            <p style="font-size: 14px; margin-bottom: 15px;">是不是迷路了？🧋</p>
+
+            <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                    <td align="center">
+                        <table border="0" cellspacing="0" cellpadding="0">
+                            <tr>
+                                <td align="center" style="border-radius: 20px;" bgcolor="#d81b60">
+                                    <a href="{{{cancellationUrl}}}" target="_blank"
+                                        style="font-size: 16px; font-family: Helvetica, Arial, sans-serif; color: #ffffff; text-decoration: none; padding: 10px 20px; border-radius: 20px; border: 1px solid #d81b60; display: inline-block; font-weight: bold;">
+                                        取消預約
+                                    </a>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+
+            <p style="font-size: 12px; margin-top: 15px; color: #888;">
+                如果按鈕無法點擊:<br>
+                <a href="{{{cancellationUrl}}}" style="color: #d81b60;">{{{cancellationUrl}}}</a>
+            </p>
         </div>
         {{/if}}
 
         <div class="footer">
-            <p>本郵件由 {{store.name}} 預約系統自動發送。</p>
+            <p>This email was sent automatically from {{store.name}}.</p>
             <p>&copy; {{currentYear}} {{store.name}}</p>
         </div>
     </div>
