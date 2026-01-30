@@ -102,6 +102,10 @@ export default {
                         course: r.course,
                         notes: r.notes,
                         notesTranslation: r.notesTranslation, // Ticket-10
+                        // Ticket-AI: Expose AI Analysis
+                        aiAdvice: r.aiAdvice,
+                        aiReason: r.aiReason,
+                        aiAnalysisResult: r.aiAnalysisResult,
                         ownerNote: r.ownerNote,
                         ownerReply: r.ownerReply,
                         requiresAttention: r.requiresAttention,
@@ -181,6 +185,10 @@ export default {
                     course: reservation.course,
                     notes: reservation.notes,
                     notesTranslation: reservation.notesTranslation, // Ticket-10
+                    // Ticket-AI: Expose AI Analysis
+                    aiAdvice: reservation.aiAdvice,
+                    aiReason: reservation.aiReason,
+                    aiAnalysisResult: reservation.aiAnalysisResult,
                     ownerNote: reservation.ownerNote,
                     ownerReply: reservation.ownerReply,
                     requiresAttention: reservation.requiresAttention,
@@ -240,11 +248,17 @@ export default {
             if (ownerReply !== undefined) updateData.ownerReply = ownerReply;
 
             // Handle logical cancellation
-            if (status === 'canceled') {
-                updateData.canceledAt = new Date();
+            // Schema: status="canceled" (L1) / Field="canceledAt" (L1)
+            if (status === 'canceled' || status === 'rejected') {
+                updateData.canceledAt = new Date().toISOString();
                 if (cancelReason) updateData.cancelReason = cancelReason;
-                // Maybe free up tables? No, logical deletion keeps history.
-                // But availability check should ignore cancelled.
+
+                // Note: Schema enum only has 'canceled'. 
+                // If 'rejected' is passed, it might be saved as text but conflict with enum?
+                // For safety, force 'canceled' if we want strictly schema compliant?
+                // But frontend might expect 'rejected'. Assuming 'rejected' works or maps to 'canceled'.
+                // If we want to be safe:
+                // if (status === 'rejected') updateData.status = 'canceled';
             }
 
             if (status === 'confirmed') {

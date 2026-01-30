@@ -130,7 +130,7 @@
         "cancelReason": {
             "type": "string"
         },
-        "cancelledAt": {
+        "canceledAt": {
             "type": "datetime"
         },
         "notesTranslation": {

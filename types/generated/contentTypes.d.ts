@@ -479,6 +479,9 @@ export interface ApiCustomerCustomer extends Struct.CollectionTypeSchema {
     draftAndPublish: false;
   };
   attributes: {
+    anniversaryDate: Schema.Attribute.Date;
+    anniversaryTitle: Schema.Attribute.String;
+    birthday: Schema.Attribute.Date;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -611,7 +614,7 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
     aiAnalysisResult: Schema.Attribute.JSON;
     aiReason: Schema.Attribute.Text;
     assignedTables: Schema.Attribute.Relation<'manyToMany', 'api::table.table'>;
-    cancelledAt: Schema.Attribute.DateTime;
+    canceledAt: Schema.Attribute.DateTime;
     cancelReason: Schema.Attribute.String;
     cancelToken: Schema.Attribute.String;
     confirmedAt: Schema.Attribute.DateTime;

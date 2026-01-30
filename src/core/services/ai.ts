@@ -13,7 +13,7 @@ export const AiService = {
             console.warn("AiService: No API Key. Returning empty string.");
             return "";
         }
-        const modelName = process.env.AI_MODEL_LITE || "gemini-1.5-flash-8b";
+        const modelName = process.env.AI_MODEL_LITE || "gemini-1.5-flash-001";
 
         const model = genAI.getGenerativeModel({
             model: modelName,
@@ -49,12 +49,14 @@ export const AiService = {
       あなたはレストランの予約管理AIです。客のコメントを分析してください。
 
       【タスク】
-      1. 店側の特別な対応や確認が必要か判定せよ ("requiresAction")
-      2. その理由を短く述べよ ("reason")
-      3. **顧客プロフィールとして長期保存すべき重要な情報**（アレルギー、記念日、好き嫌い、子供の有無など）があれば抽出せよ ("customerTrait")
-         - 保存すべき情報がない場合は null にせよ
-         - "楽しみにしています" などの挨拶は保存不要
-         - "結婚記念日です" -> "結婚記念日(1/25)" のように抽象化して抽出
+       1. 店側の特別な対応（アレルギー、席指定、質問への回答）が必要か判定せよ ("requiresAction")
+       2. その理由を短く述べよ ("reason")
+       3. **どんなに些細なことでも、顧客の好みや特徴、イベント情報があれば全て抽出せよ** ("customerTrait")
+          - 「窓際希望」「奥の席希望」などは「座席の好み」として必ず抽出。
+          - 「誕生日」「記念日」「お祝い」などは「イベント」として必ず抽出。
+          - 「ピーマン苦手」「柔らかめ希望」などは「食事の好み」として必ず抽出。
+          -  単なる「よろしくお願いします」等の挨拶以外は、基本的に全て拾ってください。
+          - "結婚記念日です" -> "結婚記念日(1/25)" のように抽象化して抽出
       
       出力は JSON 形式のみ: { "requiresAction": boolean, "reason": string, "customerTrait": string | null }
 
@@ -100,7 +102,7 @@ export const AiService = {
     async generateStandard(prompt: string): Promise<string> {
         if (!API_KEY) return "APIキー設定なし";
 
-        const modelName = process.env.AI_MODEL_STANDARD || "gemini-1.5-flash";
+        const modelName = process.env.AI_MODEL_STANDARD || "gemini-1.5-flash-001";
         const model = genAI.getGenerativeModel({ model: modelName });
 
         try {

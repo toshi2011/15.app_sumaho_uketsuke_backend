@@ -141,25 +141,35 @@ export default factories.createCoreController('api::reservation.reservation', ({
                                 // Ticket-AI-05: Auto-Transcription to Customer Note
                                 if (aiResult.customerTrait && linkedCustomerId) {
                                     /*
-                                     * Note: We are inside a transaction wrapper for Reservation Creation.
-                                     * Updating Customer here is safe.
-                                     * Strapi v5: Use documents API for ID update.
+                                     * 注：予約作成用のトランザクションラッパー内にいます。
+                                     * ここで顧客を更新しても安全です。
+                                     * Strapi v5：ID更新にはドキュメントAPIを使用してください。
                                      */
                                     try {
-                                        // Fetch latest note content first to ensure we append correctly
-                                        // linkedCustomerData might be stale if updated recently? 
-                                        // Transaction isolation should handle it, but for safety lets re-fetch lightweight or use append logic?
-                                        // For simplicity, use the ID we have.
+                                        // 正しく追記するため、まず最新のノート内容を取得する
+                                        // リンクされた顧客データは最近更新された場合、古い可能性がある？
+                                        // トランザクション分離で処理されるはずだが、安全のため軽量な再取得か追記ロジックを使用？
+                                        // 簡素化のため、既存のIDを使用する。
+                                        // 可能であればトランザクション内の最新ノートを取得するか、安全に上書きする？
+                                        // Strapiの更新は「SQL Append」をサポートしていない。必ず Read -> Modify -> Write を実行する必要がある。
 
-                                        // We need to fetch the current note inside transaction if possible, or just overwrite safely?
-                                        // Strapi update doesn't support "SQL Append". We must Read -> Modify -> Write.
+                                        // 可能ならトランザクション内で現在のノートを取得すべきか、それとも安全に上書きするべきか？
+                                        // Strapiの更新は「SQL Append」をサポートしていない。必ず読み取り→変更→書き込みの順序で処理する必要がある。
+                                        // Translated with www.DeepL.com/Translator (free version)
+
+
                                         const targetCustomer = await strapi.documents('api::customer.customer').findOne({
                                             documentId: linkedCustomerId
                                         });
 
                                         if (targetCustomer) {
-                                            const todayStr = new Date().toLocaleDateString('ja-JP');
-                                            const appendText = `\n\n【${todayStr} AI自動転記】\n${aiResult.customerTrait}`;
+                                            // チケット2: ヘッダーフォーマット改善
+                                            // 「いつの、何の予約に基づいたメモか」を明確化
+                                            const visitDate = data.date.replace(/-/g, '/');
+                                            const now = new Date();
+                                            const recordedAt = `${now.getMonth() + 1}/${now.getDate()} ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+                                            const header = `【${visitDate} 来店予定の要望 (記録: ${recordedAt})】`;
+                                            const appendText = `\n\n${header}\n${aiResult.customerTrait}`;
                                             const newNote = (targetCustomer.internalNote || "") + appendText;
 
                                             await strapi.documents('api::customer.customer').update({
@@ -186,31 +196,54 @@ export default factories.createCoreController('api::reservation.reservation', ({
                         // Ticket-AI-03: CRM Advice (Using pre-calculated context)
                         if (data.phone) {
                             try {
-                                // FEAT-AI-01: Skip advice if no past context (first time customer)
-                                console.log(`[Reservation] AI Advice Check: Customer=${linkedCustomerId}, ContextLength=${customerContextText ? customerContextText.length : 0}, Context=${customerContextText ? customerContextText.replace(/\n/g, ' ') : 'null'}`);
-                                if (customerContextText && linkedCustomerId) {
+                                // FEAT-AI-01: Update condition to allow advice if notes exist, even without past context
+
+                                // Greeting Check: Skip if pure greeting (no context)
+                                const isGreeting = data.aiReason && (data.aiReason.includes('挨拶') || data.aiReason.includes('Greeting'));
+
+                                console.log(`[Reservation] AI Advice Check: Customer=${linkedCustomerId}, ContextLength=${customerContextText ? customerContextText.length : 0}, NotesLength=${data.notes ? data.notes.length : 0}, IsGreeting=${isGreeting}`);
+
+                                // Fix: Allow generation if context exists OR if current notes exist (AND not just a greeting)
+                                const shouldGenerate = linkedCustomerId && (customerContextText || (data.notes && !isGreeting));
+
+                                if (shouldGenerate) {
+                                    // チケット5: プロンプト改善 - インプットを明確に構造化
                                     const advicePrompt = `
-                                      あなたはレストランの店主をサポートするAIです。
-                                      過去の顧客情報と今回の要望から、店主への接客アドバイスを生成してください。
-                                      
-                                      顧客情報: ${customerContextText || "なし"}
-                                      今回の要望: ${data.notes || "なし"}
-                                      
-                                      出力はアドバイスのテキストのみ（簡潔に一言二言で）。
-                                    `;
+あなたはレストランの店主をサポートするAIアシスタントです。
+「過去の顧客メモ」と「今回の要望」を照らし合わせ、店主が今日どう動くべきか1行でアドバイスしてください。
+
+【過去の記録・メモ】
+${customerContextText || "なし"}
+
+【今回のお客様の要望】
+${data.notes || "なし"}
+
+※今回が初めての備考であっても、その内容から注意点を教えてください。
+
+出力は1行のアドバイスのみ。余計な説明は不要です。
+`;
                                     // Use Standard model for Advice to avoid Lite rate limits and for better quality
                                     const advice = await AiService.generateStandard(advicePrompt);
                                     data.aiAdvice = advice;
                                     strapi.log.info(`[Reservation] AI Advice Generated.`);
-                                    console.log(`[Reservation] AI Advice Generated: ${advice.substring(0, 30)}...`);
+                                    console.log(`[Reservation] AI Advice Generated: ${advice.substring(0, 50)}...`);
+                                } else {
+                                    // Ticket-AI-Skip: Set explicit message when skipping
+                                    if (linkedCustomerId && !customerContextText) {
+                                        if (isGreeting) {
+                                            data.aiAdvice = "初めてのお客さま：備考履歴なし";
+                                        } else if (!data.notes) {
+                                            data.aiAdvice = "初めてのお客さま：備考なし";
+                                        }
+                                    }
                                 }
                             } catch (e) {
-                                strapi.log.error(`[Reservation] AI Advice Error:`, e);
+                                strapi.log.error(`[Reservation] AI Advice Error: `, e);
                             }
                         }
 
                         // Ticket Auto-Confirm: Override status based on Store Config
-                        console.log(`[ReservationController] Auto-Confirm Check: Mode=${result.bookingAcceptanceMode}, Action=${result.action}`);
+                        console.log(`[ReservationController] Auto - Confirm Check: Mode = ${result.bookingAcceptanceMode}, Action = ${result.action}`);
                         if (result.bookingAcceptanceMode === 'auto' && result.action === 'proceed') {
                             if (aiRequiresAction) {
                                 strapi.log.info('[Reservation] AI Override: Notes require action. Status -> pending.');
@@ -240,7 +273,7 @@ export default factories.createCoreController('api::reservation.reservation', ({
                         const config = StoreConfig.resolve(storeEnt);
                         const menuItems = (storeEnt as any)?.menuItems || [];
 
-                        console.log(`[Reservation] Manual Duration Resolution: TargetTime=${data.time}, CourseId=${data.courseId || 'none'}`);
+                        console.log(`[Reservation] Manual Duration Resolution: TargetTime = ${data.time}, CourseId = ${data.courseId || 'none'}`);
 
                         // === USE StoreDomain.getCourseDuration for duration calculation (includes course support) ===
                         const durationResult = StoreDomain.getCourseDuration(data.courseId || null, menuItems, data.time, config);
@@ -248,7 +281,7 @@ export default factories.createCoreController('api::reservation.reservation', ({
                         if (durationResult.courseName) {
                             data.course = durationResult.courseName;
                         }
-                        console.log(`[Reservation] Applied Duration via StoreDomain: ${data.duration} min (source: ${durationResult.source})`);
+                        console.log(`[Reservation] Applied Duration via StoreDomain: ${data.duration} min(source: ${durationResult.source})`);
                     }
 
                     const startMin = timeToMinutes(data.time);
@@ -332,10 +365,10 @@ export default factories.createCoreController('api::reservation.reservation', ({
 
                             if (StoreDomain.isTimeOverlap(startMin, endMin, existingStartMin, existingEndMin)) {
                                 // 競合検出！
-                                strapi.log.warn(`[Reservation] Overlap detected: 
-                                    New=${data.time}-${minutesToTime(endMin)}, 
-                                    Existing=${existing.time}-${minutesToTime(existingEndMin)}, 
-                                    Table=${existingNonCounterTableIds.join(',')}`);
+                                strapi.log.warn(`[Reservation] Overlap detected:
+            New = ${data.time} - ${minutesToTime(endMin)},
+            Existing = ${existing.time} - ${minutesToTime(existingEndMin)},
+            Table = ${existingNonCounterTableIds.join(',')}`);
 
                                 return ctx.conflict('Reservation conflict: Table already reserved for this time slot', {
                                     reason: 'overlapping_reservation',
@@ -386,17 +419,67 @@ export default factories.createCoreController('api::reservation.reservation', ({
 
         // Note: strapi.documents API is preferred in v5 for documentId handling
         return await strapi.db.transaction(async (transaction) => {
-            console.log(`[Reservation] Update Request. ID: ${id}`);
+            console.log(`[Reservation] Update Request.ID: ${id}`);
 
             // Fetch existing using documents API
             const existing = await strapi.documents('api::reservation.reservation').findOne({
                 documentId: id,
-                populate: ['store']
+                populate: ['store', 'customer']
             });
 
-            console.log(`[Reservation] Update Found Existing:`, existing ? `YES (ID: ${existing.documentId})` : 'NO');
+            console.log(`[Reservation] Update Found Existing: `, existing ? `YES(ID: ${existing.documentId})` : 'NO');
 
             if (!existing) return ctx.notFound();
+
+            // ============================================================
+            // ★ ここ（256行目付近）に以下の AIロジックを挿入します 開発者テスト用：効かない。承認メールが飛んでしまう。
+            // ============================================================
+            // const notesChanged = data.notes !== undefined && data.notes !== existing.notes;
+            // const needsAiProcessing = notesChanged || (!existing.aiAdvice && data.notes);
+
+            // if (needsAiProcessing && data.notes) {
+            //     try {
+            //         // A. 備考の分析と特徴抽出
+            //         const aiResult = await AiService.classifyNote(data.notes);
+            //         data.aiAnalysisResult = aiResult;
+            //         data.aiReason = aiResult.reason;
+
+            //         // B. 顧客メモ（internalNote）への自動転記
+            //         const linkedCustomerId = data.customer || existing.customer?.documentId;
+            //         if (aiResult.customerTrait && linkedCustomerId) {
+            //             const targetCustomer = await strapi.documents('api::customer.customer').findOne({
+            //                 documentId: linkedCustomerId
+            //             });
+
+            //             if (targetCustomer) {
+            //                 const visitDate = (data.date || existing.date).replace(/-/g, '/');
+            //                 const now = new Date();
+            //                 const recordedAt = `${now.getMonth() + 1}/${now.getDate()} ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+            //                 const header = `【${visitDate} 来店予定の要望 (編集記録: ${recordedAt})】`;
+
+            //                 const newNote = (targetCustomer.internalNote || "") + `\n\n${header}\n${aiResult.customerTrait}`;
+            //                 await strapi.documents('api::customer.customer').update({
+            //                     documentId: linkedCustomerId,
+            //                     data: { internalNote: newNote }
+            //                 });
+            //             }
+            //         }
+
+            //         // C. 接客アドバイスの生成
+            //         const advicePrompt = `
+            //     あなたはレストランの店主をサポートするAIです。
+            //     以下の情報を踏まえ、今日の接客で店主が最も注意すべきポイントを1行で教えてください。
+            //     【今回の要望】: ${data.notes}
+            //     【顧客メモ】: ${existing.customer?.internalNote || "なし"}
+            //     `;
+            //         data.aiAdvice = await AiService.generateStandard(advicePrompt);
+            //     } catch (e) {
+            //         strapi.log.error(`[Reservation Update AI] Error:`, e);
+            //     }
+            // }
+            // ============================================================
+            // ★ AIロジック 挿入終了
+            // ============================================================
 
             // 2. Logic: If time/duration changed, re-calc endTime/isOvernight
             if (data.time || data.duration) {
@@ -474,20 +557,7 @@ export default factories.createCoreController('api::reservation.reservation', ({
         });
     },
 
-    // Keep default find/findOne?
-    // User Ticket01 customized them to inject duration.
-    // Ticket 02 persists duration, so we can revert find/findOne customizations?
-    // "Backend determines ... persist directly." -> This implies reading is standard now.
-    // **YES**, we can remove the 'on-the-fly calculation' in find/findOne!
-    // This is a great simplification and performance boost.
 
-    // Using default find/findOne
-    async find(ctx) {
-        return await super.find(ctx);
-    },
-    async findOne(ctx) {
-        return await super.findOne(ctx);
-    },
 
     // Ticket-06: Web Cancellation (Public)
     async getReservationByToken(ctx) {
@@ -546,21 +616,21 @@ export default factories.createCoreController('api::reservation.reservation', ({
                 data: {
                     status: 'canceled',
                     cancelReason: reason || 'User Web Cancellation',
-                    cancelledAt: new Date().toISOString(),
-                    // Ensure ownerReply is updated so lifecycle sends email with reason if needed?
-                    // Actually lifecycle uses ownerReply from params.data as per our fix.
-                    // But here we are client -> server.
-                    // If we want the reason in the email to the owner, we might need to put it somewhere?
-                    // Lifecycle logs `emailResult` based on updated data.
+                    canceledAt: new Date().toISOString(),
+                    // 必要に応じてライフサイクルが理由を記載したメールを送信できるよう、ownerReplyが更新されていることを確認する？
+                    // 実際のところ、修正内容に基づきライフサイクルはparams.dataからownerReplyを使用している。
+                    // ただしここではクライアント→サーバーの流れである。
+                    // 所有者へのメールに理由を記載したい場合、どこかに記載する必要があるかもしれない？
+                    // ライフサイクルは更新されたデータに基づいて`emailResult`をログに記録する。
                 },
                 status: 'published'
             });
 
-            // Note: recalculateDailyLaneIndices?
-            // "Cancelled" reservations are ignored by lane logic usually,
-            // but if we want to redraw timeline, yes we might need to update.
-            // But timeline is read-status dependent.
-            // Let's safe-call recalculate for consistency.
+            // 注: recalculateDailyLaneIndices?
+            // 「キャンセル済み」の予約は通常レーンロジックで無視されるが、
+            // タイムラインを再描画する場合、更新が必要になる可能性がある。
+            // ただしタイムラインは読み取り状態に依存する。
+            // 一貫性を保つため、安全に再計算を呼び出そう。
             if (reservation.store && reservation.date) {
                 await strapi.service('api::reservation.reservation').recalculateDailyLaneIndices(
                     reservation.store.documentId,

@@ -26,6 +26,18 @@ export default {
         }
     },
 
+    async beforeUpdate(event) {
+        const { params } = event;
+        const data = params.data;
+
+        // ステータスがキャンセル・拒否に変更される場合、canceledAt (L1) を自動設定
+        // Schema definition: status="canceled", canceledAt (L1)
+        if (data && (data.status === 'rejected' || data.status === 'canceled') && !data.canceledAt) {
+            strapi.log.info(`[Lifecycle:beforeUpdate] Auto-setting canceledAt for status: ${data.status}`);
+            data.canceledAt = new Date().toISOString();
+        }
+    },
+
     async afterCreate(event) {
         const { result } = event;
         strapi.log.info(`[Lifecycle:afterCreate] ID=${result.id} Status=${result.status}`);
@@ -149,9 +161,9 @@ export default {
 
         const data = params?.data;
 
-        // Check if this update is from a status change by the admin
-        // Not from the initial creation with auto-confirm
-        const isManualStatusChange = data?.confirmedAt || data?.cancelledAt;
+        // この更新が管理者によるステータス変更によるものか確認する
+        // 自動承認による初期作成ではない
+        const isManualStatusChange = data?.confirmedAt || data?.canceledAt;
 
         // Additional check: Look at the createdAt vs updatedAt to detect if this
         // is essentially the same moment (creation with auto-confirm)
@@ -176,7 +188,7 @@ export default {
         }
 
         if (!isManualStatusChange) {
-            strapi.log.info('[Lifecycle:afterUpdate] No confirmedAt/cancelledAt in update data, skipping email');
+            strapi.log.info('[Lifecycle:afterUpdate] No confirmedAt/canceledAt in update data, skipping email');
             return;
         }
 
@@ -260,12 +272,12 @@ export default {
                     'confirmed'
                 );
                 sent = true;
-            } else if (newStatus === 'rejected' || newStatus === 'cancelled') {
+            } else if (newStatus === 'rejected' || newStatus === 'canceled') {
                 console.log(`[Lifecycle:afterUpdate] Sending CANCELLED email for ${result.id}`);
                 emailResult = await strapi.service('api::reservation.email').sendReservationEmail(
                     reservationWithStore,
                     store,
-                    'cancelled'
+                    'cancelled' // Template name might still be 'cancelled'? Check email service or keep as checks
                 );
                 sent = true;
             }
