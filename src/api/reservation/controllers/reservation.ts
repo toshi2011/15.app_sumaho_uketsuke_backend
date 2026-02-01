@@ -209,18 +209,21 @@ export default factories.createCoreController('api::reservation.reservation', ({
                                 if (shouldGenerate) {
                                     // チケット5: プロンプト改善 - インプットを明確に構造化
                                     const advicePrompt = `
-あなたはレストランの店主をサポートするAIアシスタントです。
-「過去の顧客メモ」と「今回の要望」を照らし合わせ、店主が今日どう動くべきか1行でアドバイスしてください。
+あなたはプロのレストランマネージャーです。店主に対し、今回の接客における「最優先事項」を1行で助言してください。
 
-【過去の記録・メモ】
+【今回の予約日】: ${data.date}
+【今回のお客様の要望】: ${data.notes || "なし"}
+
+【顧客の蓄積情報】:
 ${customerContextText || "なし"}
 
-【今回のお客様の要望】
-${data.notes || "なし"}
+【指示】
+1. 「今回のお客様の要望」を最優先にしてください。
+2. 「顧客の基本特性」にアレルギーや宗教上の禁忌があれば、今回の日付でも必ず考慮してください。
+3. 「別日程での要望履歴」は、日付が異なるイベント（例：別日の誕生日、別日の質問）であれば、今回の接客には混ぜないでください。
+4. 複数の要望が混在する場合、今回の予約内容に矛盾しない範囲で整理してください。
 
-※今回が初めての備考であっても、その内容から注意点を教えてください。
-
-出力は1行のアドバイスのみ。余計な説明は不要です。
+出力は1行（50文字程度）のアドバイスのみ。
 `;
                                     // Use Standard model for Advice to avoid Lite rate limits and for better quality
                                     const advice = await AiService.generateStandard(advicePrompt);

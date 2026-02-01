@@ -41,53 +41,44 @@ export const AiService = {
      * 備考欄の重要度判定 ＆ 顧客情報抽出
      * タイムアウトエラー時は安全策として true (要確認) を返す
      */
-    async classifyNote(note: string): Promise<{ requiresAction: boolean; reason?: string; customerTrait?: string | null }> {
+    async classifyNote(note: string): Promise<{
+        requiresAction: boolean;
+        reason?: string;
+        customerTrait?: string | null;
+        isPermanent?: boolean; // 恒久的な特徴（アレルギー等）かどうかの判定を追加
+    }> {
         if (!note || !note.trim()) return { requiresAction: false, customerTrait: null };
 
-        // プロンプトインジェクション対策: デリミタで囲む
         const prompt = `
-      あなたはレストランの予約管理AIです。客のコメントを分析してください。
+        あなたはレストランの予約管理AIです。客のコメントを分析し、店主が管理しやすい形に整理してください。
 
-      【タスク】
-       1. 店側の特別な対応（アレルギー、席指定、質問への回答）が必要か判定せよ ("requiresAction")
-       2. その理由を短く述べよ ("reason")
-       3. **どんなに些細なことでも、顧客の好みや特徴、イベント情報があれば全て抽出せよ** ("customerTrait")
-          - 「窓際希望」「奥の席希望」などは「座席の好み」として必ず抽出。
-          - 「誕生日」「記念日」「お祝い」などは「イベント」として必ず抽出。
-          - 「ピーマン苦手」「柔らかめ希望」などは「食事の好み」として必ず抽出。
-          -  単なる「よろしくお願いします」等の挨拶以外は、基本的に全て拾ってください。
-          - "結婚記念日です" -> "結婚記念日(1/25)" のように抽象化して抽出
-      
-      出力は JSON 形式のみ: { "requiresAction": boolean, "reason": string, "customerTrait": string | null }
+        【分析ルール】
+        1. 特別な対応（アレルギー、質問回答、記念日対応）が必要なら "requiresAction": true。
+        2. "customerTrait" は、以下のルールで短く抽出。
+            - 質問（〜ありますか？）の場合：「質問：[内容]の有無確認」
+            - アレルギー・禁忌：「禁忌：[食材]」
+            - 記念日：「イベント：[内容]」
+            - 好み：「好み：[内容]」
+        3. "isPermanent" は、その情報が将来の来店時にも重要なら true（例：アレルギー、宗教上の理由、苦手なもの）、今回の来店限定なら false（例：今回の質問、今回のイベント、今回の席指定）にしてください。
 
-      例:
-      "卵アレルギーです" -> { "requiresAction": true, "reason": "アレルギー対応", "customerTrait": "アレルギー: 卵" }
-      "窓際希望" -> { "requiresAction": true, "reason": "座席指定", "customerTrait": "座席好み: 窓際" }
-      "駐車場はありますか" -> { "requiresAction": true, "reason": "質問あり", "customerTrait": null }
-      "楽しみにしています" -> { "requiresAction": false, "reason": "挨拶", "customerTrait": null }
-      "結婚記念日です" -> { "requiresAction": false, "reason": "祝事報告", "customerTrait": "記念日: 結婚記念日" }
+        出力は JSON 形式のみ: { "requiresAction": boolean, "reason": string, "customerTrait": string | null, "isPermanent": boolean }
 
-      客のコメント:
-      """
-      ${note}
-      """
-    `;
+        客のコメント:
+        """
+        ${note}
+        """
+        `;
 
         try {
-            // JSONモードで呼び出し
             const jsonText = await this.generateLite(prompt, true);
             const data = JSON.parse(jsonText);
 
-            const result = {
+            return {
                 requiresAction: data.requiresAction === true,
                 reason: data.reason || "",
-                customerTrait: data.customerTrait || null
+                customerTrait: data.customerTrait || null,
+                isPermanent: data.isPermanent === true // 新規追加
             };
-
-            // 成功ログ (デバッグ用)
-            console.log(`[AiService] Classify Success: Action=${result.requiresAction}, Reason=${result.reason}`);
-
-            return result;
         } catch (error) {
             console.error("AiService.classifyNote Error/Timeout:", error);
             // エラー時は安全側に倒して「要確認」とする
