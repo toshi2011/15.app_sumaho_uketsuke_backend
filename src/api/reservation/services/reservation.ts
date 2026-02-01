@@ -77,66 +77,118 @@ export default factories.createCoreService('api::reservation.reservation', ({ st
 
         console.log(`[LaneCalc] Store: ${storeId}, Date: ${date}, Total: ${uniqueReservations.length}, Counter: ${counterReservations.length}, Table: ${tableReservations.length}`);
 
-        // 4. Helper function for lane assignment
-        const assignLanes = (resGroup: typeof reservations): Map<string, number> => {
-            const lanes: number[] = [];
-            const assignments = new Map<string, number>();
+        // 4. Assign Lanes (Updated for independent tables)
+        const updates: Promise<any>[] = [];
 
-            for (const res of resGroup) {
-                const startMin = timeToMinutes(res.time);
-                const duration = res.duration || 90;
-                const endMin = startMin + duration;
+        // --- Counter Logic (Global Packing per "Counter Group" implicit assumption) ---
+        // For counters, we stick to "Global Packing" for now as they are often treated as one resource pool or grouped physically.
+        // Or strictly speaking, we should group by table ID if we want rows to be independent?
+        // But counters are special: "Counter A-1" and "Counter A-2" are distinct rows.
+        // Yes, they should ALSO be independent! 
+        // If I sit at Counter 1, my lane is 0. If you sit at Counter 2, your lane is 0.
+        // Current logic packs them: Counter 1 (Lane 0), Counter 2 (Lane 1).
+        // This causes the "Staircase" effect on counters too!
+        // So actually, the NEW LOGIC applies primarily to ALL tables including counters.
+        // However, `CounterLaneGroup` in Frontend groups them and draws them in one block?
+        // Let's re-read TimelineView:
+        // `CounterLaneGroup` receives `lanes`. It iterates lanes and draws rows.
+        // If we change Counter 1 -> Lane 0, Counter 2 -> Lane 0.
+        // `CounterLaneGroup` will put both in Lane 0 array.
+        // `CounterLaneGroup` renders Lane 0 array in ONE row.
+        // Result: Overlap visual (Res 1 on top of Res 2).
+        // BAD for Counters if they are handled as a group!
+        // 
+        // Wait, `CounterLaneGroup` renders reservations relative to the *Group*.
+        // If Res A is on Table C1, Res B on Table C2. Both in Group "Counter".
+        // They are different PHYSICAL tables.
+        // If they are both Lane 0, they draw on top of each other?
+        // `CounterLaneGroup` iteration:
+        // {lane.map(res => ... div style={{ left, top: laneIndex * height }} ...)}
+        // Yes, if both are Lane 0, they draw at same Top.
+        // BUT they have different `left` (time).
+        // If they overlap in time:
+        // Res A (12:00-13:00) Lane 0. Res B (12:00-13:00) Lane 0.
+        // They draw on top of each other!
+        // SO: For Counters (grouped display), they MUST conflict if times overlap, even if tables differ.
+        // BECAUSE they share the same "Row" valid space in the UI (the Group is the Row-set).
+        //
+        // CONCLUSION:
+        // - Standard Tables: Each table has its own row. Logic: Independent.
+        // - Counters: Grouped tables share rows. Logic: Global (within group).
 
-                let assignedLane = -1;
-                for (let i = 0; i < lanes.length; i++) {
-                    if (lanes[i] <= startMin) {
-                        assignedLane = i;
-                        lanes[i] = endMin;
-                        break;
-                    }
+        // --- Counter Logic: Keep Global Packing (per group ideally, but global is safe fallback) ---
+        const counterLanes: number[] = [];
+        for (const res of counterReservations) {
+            const startMin = timeToMinutes(res.time);
+            const duration = res.duration || 90;
+            const endMin = startMin + duration;
+
+            let assignedLane = -1;
+            for (let i = 0; i < counterLanes.length; i++) {
+                if (counterLanes[i] <= startMin) {
+                    assignedLane = i;
+                    counterLanes[i] = endMin;
+                    break;
                 }
-
-                if (assignedLane === -1) {
-                    assignedLane = lanes.length;
-                    lanes.push(endMin);
-                }
-
-                assignments.set(res.documentId, assignedLane);
+            }
+            if (assignedLane === -1) {
+                assignedLane = counterLanes.length;
+                counterLanes.push(endMin);
             }
 
-            return assignments;
-        };
-
-        // 5. Calculate lanes separately for counter and table reservations
-        const counterLanes = assignLanes(counterReservations);
-        const tableLanes = assignLanes(tableReservations);
-
-        // 6. Prepare updates
-        const updates = [];
-
-        for (const [docId, lane] of counterLanes) {
-            const res = counterReservations.find((r: any) => r.documentId === docId);
-            if (res && res.laneIndex !== lane) {
-                updates.push(
-                    strapi.db.query('api::reservation.reservation').update({
-                        where: { documentId: docId },
-                        data: { laneIndex: lane },
-                        transaction
-                    } as any)
-                );
+            if (res.laneIndex !== assignedLane) {
+                updates.push(strapi.db.query('api::reservation.reservation').update({
+                    where: { documentId: res.documentId },
+                    data: { laneIndex: assignedLane },
+                    transaction
+                } as any));
             }
         }
 
-        for (const [docId, lane] of tableLanes) {
-            const res = tableReservations.find((r: any) => r.documentId === docId);
-            if (res && res.laneIndex !== lane) {
-                updates.push(
-                    strapi.db.query('api::reservation.reservation').update({
-                        where: { documentId: docId },
-                        data: { laneIndex: lane },
-                        transaction
-                    } as any)
-                );
+        // --- Table Logic: Per-Table Independent Packing ---
+        // tableId -> [lane0_end, lane1_end...]
+        const tableOccupancy = new Map<number, number[]>();
+
+        // Sort table reservations by time (already done via query orderBy, but for safety...)
+        // Query ordered by time asc.
+
+        for (const res of tableReservations) {
+            const startMin = timeToMinutes(res.time);
+            const duration = res.duration || 90;
+            const endMin = startMin + duration;
+            const resTableIds = res.assignedTables?.map((t: any) => t.id) || [];
+
+            // Find best lane
+            let laneCandidate = 0;
+            while (true) {
+                let isFree = true;
+                for (const tid of resTableIds) {
+                    const ends = tableOccupancy.get(tid) || [];
+                    const occupiedUntil = ends[laneCandidate] || 0;
+                    if (occupiedUntil > startMin) {
+                        isFree = false;
+                        break;
+                    }
+                }
+                if (isFree) break;
+                laneCandidate++;
+            }
+
+            // Update Occupancy
+            for (const tid of resTableIds) {
+                const ends = tableOccupancy.get(tid) || [];
+                while (ends.length <= laneCandidate) ends.push(0);
+                ends[laneCandidate] = endMin;
+                tableOccupancy.set(tid, ends);
+            }
+
+            // Queue Update
+            if (res.laneIndex !== laneCandidate) {
+                updates.push(strapi.db.query('api::reservation.reservation').update({
+                    where: { documentId: res.documentId },
+                    data: { laneIndex: laneCandidate },
+                    transaction
+                } as any));
             }
         }
 

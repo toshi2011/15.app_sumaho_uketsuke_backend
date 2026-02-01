@@ -51,74 +51,30 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
                 // warning or silent
             }
 
-            const targetStartMin = timeToMinutes(time);
-            let adjustedTargetStart = targetStartMin;
-            // Handle late night boundary if needed
-            if (config.dinnerEndMin > 1440 && targetStartMin < config.lunchStartMin) {
-                adjustedTargetStart += 1440;
-            }
-
-            let isLunch = false;
-            let closingMin = 0;
-
-            // Rule B: Range Classification & Gap Check
-            if (adjustedTargetStart >= config.lunchStartMin && adjustedTargetStart < config.lunchEndMin) {
-                isLunch = true;
-                closingMin = config.lunchEndMin;
-            } else if (adjustedTargetStart >= config.dinnerStartMin && adjustedTargetStart < config.dinnerEndMin) {
-                isLunch = false;
-                closingMin = config.dinnerEndMin;
-            } else {
-                return {
-                    available: false,
-                    capacityUsed: 0,
-                    requiredDuration: 0,
-                    reason: `Outside of business hours. Lunch: ${formatMin(config.lunchStartMin)}~${formatMin(config.lunchEndMin)}, Dinner: ${formatMin(config.dinnerStartMin)}~${formatMin(config.dinnerEndMin)}`,
-                    action: 'reject'
-                };
-            }
-
             // === コース選択に基づく滞在時間の決定 ===
             const menuItems = (store as any).menuItems || [];
             const durationResult = StoreDomain.getCourseDuration(courseId, menuItems, time, config);
             const currentBaseDuration = durationResult.duration;
             console.log(`[StoreService] Duration resolved: ${currentBaseDuration}min (source: ${durationResult.source}${durationResult.courseName ? ', course: ' + durationResult.courseName : ''})`);
 
-
             // Duration Calculation
             let requiredDuration = Math.min(currentBaseDuration, config.maxDuration);
 
-            const targetEndMin = adjustedTargetStart + requiredDuration;
-            const targetEndWithBuffer = targetEndMin + config.cleanupDuration;
-
-            // Rule C: Closing Time Constraint
-            if (isLunch) {
-                // Lunch: Last Order Logic
-                const lastOrderLimit = closingMin - config.lastOrderOffset;
-
-                if (adjustedTargetStart > lastOrderLimit) {
-                    return {
-                        available: false,
-                        capacityUsed: 0,
-                        requiredDuration,
-                        reason: `Lunch Last Order exceeded. Max start: ${formatMin(lastOrderLimit)}. Target: ${time}`,
-                        action: 'reject'
-                    };
-                }
-            } else {
-                if (targetEndWithBuffer > closingMin) {
-                    const maxPossible = closingMin - adjustedTargetStart - config.cleanupDuration;
-                    return {
-                        available: false,
-                        capacityUsed: 0,
-                        requiredDuration,
-                        endTime: null,
-                        isOvernight: false,
-                        reason: `Exceeds closing time. Max duration available: ${maxPossible} min`,
-                        action: 'reject'
-                    };
-                }
+            // === 営業時間＆閉店時間チェック (StoreDomainに委譲) ===
+            const timeCheck = StoreDomain.canFitInBusinessHours(time, requiredDuration, config);
+            if (!timeCheck.valid) {
+                return {
+                    available: false,
+                    capacityUsed: 0,
+                    requiredDuration,
+                    reason: timeCheck.reason,
+                    action: timeCheck.action || 'reject'
+                };
             }
+
+            // タイムチェックから計算済みの時間を取得
+            const { start: adjustedTargetStart, end: targetEndWithBuffer } = timeCheck.minutes!;
+            const targetEndMin = adjustedTargetStart + requiredDuration; // 実際の終了時間（バッファなし）
 
             // Calculate EndTime/Overnight for valid response
             let clockMin = targetEndMin;
@@ -156,64 +112,22 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
             console.log(`[Overlap] Checking date=${date}, time=${time}, storeDocId=${store.documentId}, allReservations count=${allReservations.length}`);
             console.log(`[Overlap] Target slot: start=${adjustedTargetStart}min (${time}), end=${targetEndWithBuffer}min`);
 
-            // Identify overlapping reservations
-            const overlappingReservations = allReservations.filter((res) => {
-                let resStart = timeToMinutes(res.time);
-                if (resStart === -1) return false;
-
-                if (config.dinnerEndMin > 1440 && resStart < config.lunchStartMin) resStart += 1440;
-
-                // Infer duration for existing res (using same logic as target)
-                let rIsLunch = (resStart >= config.lunchStartMin && resStart < config.lunchEndMin);
-                let rBase = rIsLunch ? config.lunchDuration : config.dinnerDuration;
-
-                // Use stored duration if available (preferred), else use config default
-                const storedDuration = (res as any).duration;
-                const rDuration = Math.min(storedDuration || rBase, config.maxDuration);
-
-                // Assuming cleanup is 0 as per config, but if we had it, we'd add it here
-                const resEnd = resStart + rDuration;
-                const theirEnd = resEnd + config.cleanupDuration;
-
-                const myStart = adjustedTargetStart;
-                const myEnd = targetEndWithBuffer;
-
-                // Overlap: My Start < Their End AND Their Start < My End
-                const overlaps = (myStart < theirEnd) && (resStart < myEnd);
-
-                console.log(`[Overlap] Res ID=${(res as any).id}, time=${res.time}, start=${resStart}min, end=${theirEnd}min, overlaps=${overlaps}, tables=${(res as any).assignedTables?.map((t: any) => t.name).join(',') || 'none'}`);
-
-                return overlaps;
-            });
-
-            // Identify used tables and counter seat usage
-            const usedTableIds = new Set<number>(); // For non-counter tables (fully occupied)
-            const counterUsedSeats: Map<number, number> = new Map(); // For counter tables: tableId -> usedSeats
-            let unassignedReservationCount = 0;
-
-            // === USE StoreDomain for table normalization ===
+            // Identify used tables and counter seat usage (Moved to StoreDomain)
             const allTables = StoreDomain.resolveTables((store as any).tables);
             const activeTables = allTables.filter(t => t.isActive);
 
-            overlappingReservations.forEach(r => {
-                const res = r as any;
-                if (res.assignedTables && res.assignedTables.length > 0) {
-                    res.assignedTables.forEach((t: any) => {
-                        // Check if this is a counter-type table using normalized data
-                        const tableInStore = activeTables.find(st => st.id === t.id);
-                        if (tableInStore && tableInStore.type === 'counter') {
-                            // For counters, track used seats instead of marking entire table as used
-                            const currentUsed = counterUsedSeats.get(t.id) || 0;
-                            counterUsedSeats.set(t.id, currentUsed + (res.guests || 1));
-                        } else {
-                            // Non-counter tables are fully occupied by any reservation
-                            usedTableIds.add(t.id);
-                        }
-                    });
-                } else {
-                    unassignedReservationCount++;
-                }
-            });
+            // === USE StoreDomain call for Occupancy ===
+            const { usedTableIds, counterUsedSeats, unassignedCount } = StoreDomain.calculateOccupancy(
+                allReservations,
+                activeTables,
+                adjustedTargetStart,
+                targetEndWithBuffer,
+                config
+            );
+
+            let unassignedReservationCount = unassignedCount;
+
+            // Log counter seat usage (using normalized data)
 
             // Log counter seat usage (using normalized data)
             console.log(`[Counter] Seat usage:`, Array.from(counterUsedSeats.entries()).map(([id, used]) => {

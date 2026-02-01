@@ -50,6 +50,29 @@ export interface AvailableSlot {
 }
 
 /**
+ * 営業時間判定結果
+ */
+export interface BusinessHourValidationResult {
+    valid: boolean;
+    reason?: string;
+    action?: 'reject' | 'call_store';
+    minutes?: {
+        start: number;
+        end: number;
+        close: number;
+    };
+}
+
+/**
+ * 占有率計算結果
+ */
+export interface OccupancyResult {
+    usedTableIds: Set<number>;
+    counterUsedSeats: Map<number, number>;
+    unassignedCount: number;
+}
+
+/**
  * StoreDomain - 店舗ロジックサービス
  */
 export const StoreDomain = {
@@ -432,6 +455,168 @@ export const StoreDomain = {
         return {
             duration: defaultDuration,
             source: 'default'
+        };
+    },
+
+    /**
+     * 予約時間が営業時間内に収まるか判定する
+     * ランチ・ディナーの境界チェック、閉店時間チェックを集約
+     * 
+     * @param timeStr 開始時間 "HH:mm"
+     * @param duration 滞在時間（分）
+     * @param config ResolvedStoreConfig
+     * @returns BusinessHourValidationResult
+     */
+    canFitInBusinessHours: (
+        timeStr: string,
+        duration: number,
+        config: ResolvedStoreConfig
+    ): BusinessHourValidationResult => {
+        const startMin = timeToMinutes(timeStr);
+        // 深夜営業対応: ランチ開始より前なら翌日扱い（既存ロジック踏襲）
+        let adjustedStart = startMin;
+        if (config.dinnerEndMin > 1440 && startMin < config.lunchStartMin) {
+            adjustedStart += 1440;
+        }
+
+        const endMin = adjustedStart + duration;
+        // バッファ時間を含めた最終終了時刻
+        const endWithBuffer = endMin + config.cleanupDuration;
+
+        let isLunch = false;
+        let closeMin = 0;
+
+        // 1. 範囲判定 (Range Check)
+        if (adjustedStart >= config.lunchStartMin && adjustedStart < config.lunchEndMin) {
+            isLunch = true;
+            closeMin = config.lunchEndMin;
+        } else if (adjustedStart >= config.dinnerStartMin && adjustedStart < config.dinnerEndMin) {
+            isLunch = false;
+            closeMin = config.dinnerEndMin;
+        } else {
+            // 営業時間外
+            return {
+                valid: false,
+                reason: `営業時間外です。ランチ: ${Math.floor(config.lunchStartMin / 60)}:${(config.lunchStartMin % 60).toString().padStart(2, '0')}~, ディナー: ${Math.floor(config.dinnerStartMin / 60)}:${(config.dinnerStartMin % 60).toString().padStart(2, '0')}~`,
+                action: 'reject'
+            };
+        }
+
+        // 2. 終了時間チェック (Closing Time Check)
+        // 予約終了時間（+片付け）が閉店時間を超えてはいけない
+        if (endWithBuffer > closeMin) {
+            const maxPossibleDuration = closeMin - adjustedStart - config.cleanupDuration;
+            const closeTimeStr = `${Math.floor(closeMin / 60).toString().padStart(2, '0')}:${(closeMin % 60).toString().padStart(2, '0')}`;
+
+            return {
+                valid: false,
+                reason: `閉店時間を超過します（閉店: ${closeTimeStr}）。最大利用可能時間: ${maxPossibleDuration}分`,
+                action: 'reject',
+                minutes: {
+                    start: adjustedStart,
+                    end: endWithBuffer,
+                    close: closeMin
+                }
+            };
+        }
+
+        // 3. ランチのラストオーダーチェック (Lunch Last Order)
+        // ランチのみ、閉店ギリギリの入店を制限する場合がある (StoreConfig依存)
+        if (isLunch && config.lastOrderOffset > 0) {
+            const lastOrderLimit = closeMin - config.lastOrderOffset;
+            if (adjustedStart > lastOrderLimit) {
+                const limitStr = `${Math.floor(lastOrderLimit / 60)}:${(lastOrderLimit % 60).toString().padStart(2, '0')}`;
+                return {
+                    valid: false,
+                    reason: `ランチのラストオーダー(${limitStr})を過ぎています。`,
+                    action: 'reject'
+                };
+            }
+        }
+
+        return {
+            valid: true,
+            minutes: {
+                start: adjustedStart,
+                end: endWithBuffer,
+                close: closeMin
+            }
+        };
+    },
+
+    /**
+     * 指定時間帯の占有状況を計算する
+     * 重複予約を特定し、使用済みテーブルIDとカウンター席数を集計する
+     * 
+     * @param allReservations 日付単位の全予約リスト
+     * @param activeTables 店舗のアクティブなテーブル設定
+     * @param targetStartMin ターゲット開始時間（分）
+     * @param targetEndMin ターゲット終了時間（分）
+     * @param config ResolvedStoreConfig
+     * @returns OccupancyResult
+     */
+    calculateOccupancy: (
+        allReservations: any[],
+        activeTables: ResolvedTableConfig[],
+        targetStartMin: number,
+        targetEndMin: number,
+        config: ResolvedStoreConfig
+    ): OccupancyResult => {
+        const usedTableIds = new Set<number>();
+        const counterUsedSeats = new Map<number, number>();
+        let unassignedCount = 0;
+
+        // 重複する予約をフィルタリング
+        const overlappingReservations = allReservations.filter((res) => {
+            let resStart = timeToMinutes(res.time);
+            if (resStart === -1) return false;
+
+            // 深夜対応
+            if (config.dinnerEndMin > 1440 && resStart < config.lunchStartMin) {
+                resStart += 1440;
+            }
+
+            // 期間計算
+            let rIsLunch = (resStart >= config.lunchStartMin && resStart < config.lunchEndMin);
+            let rBase = rIsLunch ? config.lunchDuration : config.dinnerDuration;
+
+            // 保存されたduration優先、なければデフォルト
+            const storedDuration = (res as any).duration;
+            const rDuration = Math.min(storedDuration || rBase, config.maxDuration);
+
+            // 片付け時間を含めた終了時間
+            const resEnd = resStart + rDuration;
+            const theirEnd = resEnd + config.cleanupDuration;
+
+            // Overlap: My Start < Their End AND Their Start < My End
+            return (targetStartMin < theirEnd) && (resStart < targetEndMin);
+        });
+
+        // 集計
+        overlappingReservations.forEach(r => {
+            const res = r as any;
+            if (res.assignedTables && res.assignedTables.length > 0) {
+                res.assignedTables.forEach((t: any) => {
+                    // 正規化されたテーブルデータでタイプ判定
+                    const tableInStore = activeTables.find(st => st.id === t.id);
+                    if (tableInStore && tableInStore.type === 'counter') {
+                        // カウンター: 客数分を加算
+                        const currentUsed = counterUsedSeats.get(t.id) || 0;
+                        counterUsedSeats.set(t.id, currentUsed + (res.guests || 1));
+                    } else {
+                        // テーブル/個室: 完全占有
+                        usedTableIds.add(t.id);
+                    }
+                });
+            } else {
+                unassignedCount++;
+            }
+        });
+
+        return {
+            usedTableIds,
+            counterUsedSeats,
+            unassignedCount
         };
     }
 };
