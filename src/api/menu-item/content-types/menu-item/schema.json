@@ -44,6 +44,15 @@
             "type": "integer",
             "min": 60,
             "max": 180
+        },
+        "serviceType": {
+            "type": "enumeration",
+            "enum": [
+                "common",
+                "day",
+                "night"
+            ],
+            "default": "common"
         }
     }
 }

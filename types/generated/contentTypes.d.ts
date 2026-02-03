@@ -552,6 +552,8 @@ export interface ApiMenuItemMenuItem extends Struct.CollectionTypeSchema {
     name: Schema.Attribute.String & Schema.Attribute.Required;
     price: Schema.Attribute.Integer;
     publishedAt: Schema.Attribute.DateTime;
+    serviceType: Schema.Attribute.Enumeration<['common', 'day', 'night']> &
+      Schema.Attribute.DefaultTo<'common'>;
     store: Schema.Attribute.Relation<'manyToOne', 'api::store.store'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
