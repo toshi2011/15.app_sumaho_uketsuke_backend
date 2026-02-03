@@ -11,6 +11,7 @@ export default [
       keepHeaderOnError: true,
     },
   },
+  'global::store-context',
   'strapi::poweredBy',
   'strapi::query',
   {
