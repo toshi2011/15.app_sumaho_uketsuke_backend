@@ -1,4 +1,5 @@
 import { AiService } from '../../../core/services/ai';
+import { PROMPT_REGISTRY } from '../../../core/ai/prompt-registry';
 
 export default ({ strapi }) => ({
     async generateWeeklyReport(storeId: string) {
@@ -40,12 +41,7 @@ export default ({ strapi }) => ({
     `;
 
         // 4. Generate with AI
-        const prompt = `
-      以下の週間予約データを元に、店主向けの短い週報（400文字程度）を書いてください。
-      ポジティブなトーンで、来週に向けた一言アドバイスを含めてください。
-      
-      ${summaryText}
-    `;
+        const prompt = PROMPT_REGISTRY.WEEKLY_REPORT(summaryText);
 
         const report = await AiService.generateStandard(prompt);
         return report;

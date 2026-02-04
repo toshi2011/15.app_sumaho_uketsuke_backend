@@ -3,6 +3,7 @@ import { StoreConfig } from '../../../core/config/StoreConfig';
 import { StoreDomain } from '../../../core/domain/StoreDomain';
 import { timeToMinutes, minutesToTime } from '../../../utils/timeUtils'; // Need minutesToTime
 import { AiService } from '../../../core/services/ai';
+import { PROMPT_REGISTRY } from '../../../core/ai/prompt-registry';
 
 export default factories.createCoreController('api::reservation.reservation', ({ strapi }) => ({
     async create(ctx) {
@@ -128,18 +129,25 @@ export default factories.createCoreController('api::reservation.reservation', ({
                         if (result.storeLocale) data.locale = result.storeLocale;
 
                         // Ticket-AI-02 & 05: AI Note Classification & Auto-Transcription
+                        let aiPriority = 'low'; // Default
                         let aiRequiresAction = false;
+
                         if (data.notes) {
                             try {
                                 const aiResult = await AiService.classifyNote(data.notes);
                                 data.aiAnalysisResult = aiResult;
                                 data.aiReason = aiResult.reason;
                                 aiRequiresAction = aiResult.requiresAction;
-                                strapi.log.info(`[Reservation] AI Classify: Action=${aiRequiresAction}, Reason=${aiResult.reason}, Trait=${aiResult.customerTrait}`);
-                                console.log(`[Reservation] AI Classify Result: Action=${aiRequiresAction}, Reason=${aiResult.reason}, Trait=${aiResult.customerTrait}`);
+                                aiPriority = aiResult.priority || 'low'; // Use returned priority
+
+                                strapi.log.info(`[Reservation] AI Classify: Priority=${aiPriority}, Action=${aiRequiresAction}, Reason=${aiResult.reason}, Trait=${aiResult.customerTrait}`);
 
                                 // Ticket-AI-05: Auto-Transcription to Customer Note
-                                if (aiResult.customerTrait && linkedCustomerId) {
+                                // Rule: Record if trait exists AND (Priority is High/Middle OR isPermanent is true)
+                                // "priority: low" (Greetings) should not be recorded unless isPermanent=true (unlikely but safe)
+                                const shouldTranscribe = aiResult.customerTrait && (aiPriority === 'high' || aiPriority === 'middle' || aiResult.isPermanent);
+
+                                if (shouldTranscribe && linkedCustomerId) {
                                     /*
                                      * 注：予約作成用のトランザクションラッパー内にいます。
                                      * ここで顧客を更新しても安全です。
@@ -190,6 +198,7 @@ export default factories.createCoreController('api::reservation.reservation', ({
                             } catch (e) {
                                 strapi.log.error(`[Reservation] AI Classify Error:`, e);
                                 aiRequiresAction = true; // Safety fallback
+                                aiPriority = 'high'; // Safety fallback
                             }
                         }
 
@@ -207,24 +216,8 @@ export default factories.createCoreController('api::reservation.reservation', ({
                                 const shouldGenerate = linkedCustomerId && (customerContextText || (data.notes && !isGreeting));
 
                                 if (shouldGenerate) {
-                                    // チケット5: プロンプト改善 - インプットを明確に構造化
-                                    const advicePrompt = `
-あなたはプロのレストランマネージャーです。店主に対し、今回の接客における「最優先事項」を1行で助言してください。
-
-【今回の予約日】: ${data.date}
-【今回のお客様の要望】: ${data.notes || "なし"}
-
-【顧客の蓄積情報】:
-${customerContextText || "なし"}
-
-【指示】
-1. 「今回のお客様の要望」を最優先にしてください。
-2. 「顧客の基本特性」にアレルギーや宗教上の禁忌があれば、今回の日付でも必ず考慮してください。
-3. 台帳の「【YYYY/MM/DD 来店時の要望】」は、今回の日付と異なる場合、お祝いや質問の内容を今回の接客に混ぜないでください（例：別の日付の誕生日の話を今日しない）。
-4. 複数の要望が混在する場合、今回の予約内容に矛盾しない範囲で整理してください。
-
-出力は1行（50文字程度）のアドバイスのみ。
-`;
+                                    // チケット5: プロンプト改善 - Registry使用
+                                    const advicePrompt = PROMPT_REGISTRY.CUSTOMER_ADVICE(data.date, data.notes, customerContextText);
                                     // Use Standard model for Advice to avoid Lite rate limits and for better quality
                                     const advice = await AiService.generateStandard(advicePrompt);
                                     data.aiAdvice = advice;
@@ -245,16 +238,37 @@ ${customerContextText || "なし"}
                             }
                         }
 
-                        // Ticket Auto-Confirm: Override status based on Store Config
+                        // Ticket Auto-Confirm: Override status based on Store Config & AI Priority
                         console.log(`[ReservationController] Auto - Confirm Check: Mode = ${result.bookingAcceptanceMode}, Action = ${result.action}`);
-                        if (result.bookingAcceptanceMode === 'auto' && result.action === 'proceed') {
-                            if (aiRequiresAction) {
-                                strapi.log.info('[Reservation] AI Override: Notes require action. Status -> pending.');
+
+                        if (result.action === 'proceed') {
+                            if (result.bookingAcceptanceMode === 'manual') {
+                                // Manual Mode: Always Pending, requires review
                                 data.status = 'pending';
                                 data.requiresReview = true;
+                                strapi.log.info('[Reservation] Manual Mode: Force Pending.');
                             } else {
-                                data.status = 'confirmed';
-                                data.confirmedAt = new Date().toISOString();
+                                // Auto Mode: Check AI Priority
+                                // High -> Pending (Safety Stop)
+                                // Middle -> Confirmed + Badge (RequiresReview=true)
+                                // Low -> Confirmed + No Badge (RequiresReview=false)
+
+                                if (aiPriority === 'high') {
+                                    strapi.log.info('[Reservation] Auto Mode / Priority High: Status -> pending');
+                                    data.status = 'pending';
+                                    data.requiresReview = true;
+                                } else if (aiPriority === 'middle') {
+                                    strapi.log.info('[Reservation] Auto Mode / Priority Middle: Status -> confirmed (with badge)');
+                                    data.status = 'confirmed';
+                                    data.requiresReview = true; // Show Badge (e.g. Anniversary)
+                                    data.confirmedAt = new Date().toISOString();
+                                } else {
+                                    // Low
+                                    strapi.log.info('[Reservation] Auto Mode / Priority Low: Status -> confirmed');
+                                    data.status = 'confirmed';
+                                    data.requiresReview = false;
+                                    data.confirmedAt = new Date().toISOString();
+                                }
                             }
                         }
                     }

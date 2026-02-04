@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { PROMPT_REGISTRY } from "../ai/prompt-registry";
 
 const API_KEY = process.env.GOOGLE_GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(API_KEY);
@@ -39,53 +40,49 @@ export const AiService = {
 
     /**
      * 備考欄の重要度判定 ＆ 顧客情報抽出
-     * タイムアウトエラー時は安全策として true (要確認) を返す
+     * タイムアウトエラー時は安全策として priority: high (要確認) を返す
      */
     async classifyNote(note: string): Promise<{
+        priority: 'high' | 'middle' | 'low';
         requiresAction: boolean;
-        reason?: string;
+        reason: string;
         customerTrait?: string | null;
-        isPermanent?: boolean; // 恒久的な特徴（アレルギー等）かどうかの判定を追加
+        isPermanent?: boolean;
     }> {
-        if (!note || !note.trim()) return { requiresAction: false, customerTrait: null };
+        if (!note || !note.trim()) {
+            return {
+                priority: 'low',
+                requiresAction: false,
+                reason: "",
+                customerTrait: null
+            };
+        }
 
-        const prompt = `
-        あなたはレストランの予約管理AIです。客のコメントを分析し、店主が「顧客台帳」に記録すべき重要な事実を抽出してください。
-
-        【分析ルール】
-        1. 特別な対応（アレルギー、質問回答、記念日対応）が必要なら "requiresAction": true。
-        2. "customerTrait" の抽出ルール：
-          - 「誰の」「何を」をセットで具体的に記述（例：「妻の誕生日」「両親の銀婚式」「本人がエビアレルギー」）。
-          - 勝手にカテゴリ（結婚記念日など）に変換せず、客の表現を尊重すること。
-          - 挨拶（よろしくお願いします等）しかない場合は null。
-          - 好み：「好み：[内容]」
-        3. "isPermanent" の判定基準（重要）：
-          - true（恒久特性）：アレルギー、宗教上の禁忌、苦手な食材、身体的特徴、永続的な好み。
-          - false（単発イベント）：今回の来店限定の質問、今年のお祝い（誕生日・記念日）、今回の席指定。
-        4. "reason" は店主への短い通知メッセージ。
-
-        出力は JSON 形式のみ: { "requiresAction": boolean, "reason": string, "customerTrait": string | null, "isPermanent": boolean }
-
-        客のコメント:
-        """
-        ${note}
-        """
-        `;
+        const prompt = PROMPT_REGISTRY.CLASSIFY_NOTE(note);
 
         try {
             const jsonText = await this.generateLite(prompt, true);
             const data = JSON.parse(jsonText);
 
+            // バリデーションとデフォルト値設定
+            const priority = (['high', 'middle', 'low'].includes(data.priority)) ? data.priority : 'high';
+
             return {
+                priority: priority,
                 requiresAction: data.requiresAction === true,
                 reason: data.reason || "",
                 customerTrait: data.customerTrait || null,
-                isPermanent: data.isPermanent === true // 新規追加
+                isPermanent: data.isPermanent === true
             };
         } catch (error) {
             console.error("AiService.classifyNote Error/Timeout:", error);
-            // エラー時は安全側に倒して「要確認」とする
-            return { requiresAction: true, reason: `AI判定エラー/タイムアウトのため安全策として要確認に設定: ${error instanceof Error ? error.message : String(error)}`, customerTrait: null };
+            // エラー時は安全側に倒して「High (要確認)」とする
+            return {
+                priority: 'high',
+                requiresAction: true,
+                reason: "AI判定に失敗したため、安全のため要確認としています",
+                customerTrait: null
+            };
         }
     },
 
