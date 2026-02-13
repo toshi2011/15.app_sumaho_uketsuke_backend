@@ -3,7 +3,13 @@ import { v2 } from '@google-cloud/translate';
 
 // V2 Client Initialization
 // GOOGLE_APPLICATION_CREDENTIALS via .env or default location is used automatically.
-const translationClient = new v2.Translate();
+const translationClient = new v2.Translate({
+    credentials: {
+        client_email: process.env.GOOGLE_CLIENT_EMAIL,
+        private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    },
+    projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+});
 
 export const TranslationService = {
     /**
