@@ -40,6 +40,22 @@
             "type": "boolean",
             "default": false
         },
+        "type": {
+            "type": "enumeration",
+            "enum": [
+                "course",
+                "display_only"
+            ],
+            "default": "display_only"
+        },
+        "minGuests": {
+            "type": "integer",
+            "default": 1
+        },
+        "groupOrder": {
+            "type": "boolean",
+            "default": false
+        },
         "duration": {
             "type": "integer",
             "min": 60,

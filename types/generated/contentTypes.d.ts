@@ -541,6 +541,7 @@ export interface ApiMenuItemMenuItem extends Struct.CollectionTypeSchema {
         },
         number
       >;
+    groupOrder: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     image: Schema.Attribute.Media<'images'>;
     isCourse: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
@@ -549,12 +550,15 @@ export interface ApiMenuItemMenuItem extends Struct.CollectionTypeSchema {
       'api::menu-item.menu-item'
     > &
       Schema.Attribute.Private;
+    minGuests: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<1>;
     name: Schema.Attribute.String & Schema.Attribute.Required;
     price: Schema.Attribute.Integer;
     publishedAt: Schema.Attribute.DateTime;
     serviceType: Schema.Attribute.Enumeration<['common', 'day', 'night']> &
       Schema.Attribute.DefaultTo<'common'>;
     store: Schema.Attribute.Relation<'manyToOne', 'api::store.store'>;
+    type: Schema.Attribute.Enumeration<['course', 'display_only']> &
+      Schema.Attribute.DefaultTo<'display_only'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;

@@ -53,6 +53,19 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
 
             // === コース選択に基づく滞在時間の決定 ===
             const menuItems = (store as any).menuItems || [];
+
+            // === コース要件の検証 (minGuests等) ===
+            const courseCheck = StoreDomain.validateCourseRequirements(courseId, menuItems, guests);
+            if (!courseCheck.valid) {
+                return {
+                    available: false,
+                    capacityUsed: 0,
+                    requiredDuration: 0,
+                    reason: courseCheck.reason,
+                    action: 'reject'
+                };
+            }
+
             const durationResult = StoreDomain.getCourseDuration(courseId, menuItems, time, config);
             const currentBaseDuration = durationResult.duration;
             console.log(`[StoreService] Duration resolved: ${currentBaseDuration}min (source: ${durationResult.source}${durationResult.courseName ? ', course: ' + durationResult.courseName : ''})`);

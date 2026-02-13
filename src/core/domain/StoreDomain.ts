@@ -430,16 +430,22 @@ export const StoreDomain = {
         config: ResolvedStoreConfig
     ): { duration: number; source: 'course' | 'default'; courseName?: string } => {
         // コースIDが指定されている場合、該当コースを検索
+        let course: any = null;
         if (courseId && menuItems && Array.isArray(menuItems)) {
-            const course = menuItems.find((m: any) => {
+            course = menuItems.find((m: any) => {
                 // documentId または id でマッチング
                 return m.documentId === courseId ||
                     String(m.id) === String(courseId) ||
                     m.id === Number(courseId);
             });
+        }
 
-            // コースが見つかり、isCourse=true かつ duration が設定されている場合
-            if (course && course.isCourse === true && course.duration) {
+        if (course) {
+            // type === 'course' 優先、なければ isCourse (後方互換)
+            const isCourse = course.type === 'course' || (course.isCourse === true && course.type !== 'display_only');
+
+            // コースとして有効かつdurationがある場合
+            if (isCourse && course.duration) {
                 console.log(`[StoreDomain] Using Course Duration: ${course.duration}min (${course.name})`);
                 return {
                     duration: Math.min(course.duration, config.maxDuration),
@@ -447,6 +453,15 @@ export const StoreDomain = {
                     courseName: course.name
                 };
             }
+
+            // display_only または duration未設定の場合
+            // 時間はデフォルトを使うが、コース名(メニュー名)は保持する
+            const defaultDuration = StoreDomain.getDuration(timeStr, config);
+            return {
+                duration: defaultDuration,
+                source: 'default',
+                courseName: course.name
+            };
         }
 
         // コースが指定されていない or 見つからない場合はデフォルト時間を使用
@@ -456,6 +471,42 @@ export const StoreDomain = {
             duration: defaultDuration,
             source: 'default'
         };
+    },
+
+    /**
+     * コースの利用条件（人数制限など）を検証する
+     * @param courseId コースID
+     * @param menuItems メニュー配列
+     * @param guests 人数
+     * @returns { valid: boolean, reason?: string }
+     */
+    validateCourseRequirements: (
+        courseId: string | number | null,
+        menuItems: any[],
+        guests: number
+    ): { valid: boolean; reason?: string } => {
+        if (!courseId || !menuItems) return { valid: true };
+
+        const course = menuItems.find((m: any) => {
+            return m.documentId === courseId ||
+                String(m.id) === String(courseId) ||
+                m.id === Number(courseId);
+        });
+
+        if (!course) return { valid: true };
+
+        // minGuests チェック
+        // type='course' (または isCourse=true) の場合のみ有効とする仕様
+        const isCourse = course.type === 'course' || (course.isCourse === true && course.type !== 'display_only');
+
+        if (isCourse && course.minGuests && guests < course.minGuests) {
+            return {
+                valid: false,
+                reason: `このコースは${course.minGuests}名様から承ります。（現在${guests}名）`
+            };
+        }
+
+        return { valid: true };
     },
 
     /**
