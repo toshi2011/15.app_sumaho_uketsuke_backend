@@ -123,6 +123,7 @@ coverage
 ############################
 
 .env
+.env.bak
 license.txt
 exports
 .strapi
@@ -154,3 +155,4 @@ scripts/*.js
 
 doc/pg_marge_back.txt
 doc/pg_marge_back.txt
+.env.bak
