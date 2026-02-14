@@ -1,8 +1,0 @@
-{
-  "message": "Migration executed",
-  "logs": [
-    "Found 1 counters.",
-    "Migrating: カウンター1 (Cap: 5)",
-    "Found 4 reservations on カウンター1"
-  ]
-}

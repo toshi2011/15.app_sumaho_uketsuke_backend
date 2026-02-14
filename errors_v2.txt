@@ -1,2 +1,0 @@
-src/api/reservation/content-types/reservation/lifecycles.ts(26,30): error TS2322: Type '"store"' is not assignable to type '`${string}.${string}` | `${string},${string}` | PopulatableAttributeNames<"api::reservation.reservation">'.
-src/api/reservation/content-types/reservation/lifecycles.ts(85,30): error TS2322: Type '"store"' is not assignable to type '`${string}.${string}` | `${string},${string}` | PopulatableAttributeNames<"api::reservation.reservation">'.
