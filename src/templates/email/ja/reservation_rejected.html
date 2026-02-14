@@ -117,7 +117,7 @@
             <h1>{{store.name}}</h1>
         </div>
 
-        <p>{{reservation.name}} 様</p>
+        <p>{{reservation.guestName}} 様</p>
 
         <div class="status-box">
             <h2>❌ ご予約をお受けできませんでした</h2>
@@ -145,7 +145,7 @@
         {{#if reservation.ownerReply}}
         <div class="owner-message">
             <h4>💬 店舗からのメッセージ</h4>
-            <p>{{reservation.ownerReply}}</p>
+            <pre style="font-family: inherit; white-space: pre-wrap; margin: 0;">{{reservation.ownerReply}}</pre>
         </div>
         {{else}}
         <p>ご希望の日時が満席のため、今回は予約を承ることができませんでした。</p>

@@ -39,7 +39,8 @@ export default {
                 if (store.tables && store.tables.length > 0) {
                     for (const table of store.tables) {
                         // Check for the auto-generated "Main Table" or huge capacity indicating old logic
-                        if (table.baseCapacity >= 20 || table.capacity >= 20 || table.name.includes('Main Table')) {
+                        // We check both baseCapacity and capacity for safety during transition
+                        if ((table.baseCapacity && table.baseCapacity >= 20) || (table.capacity && table.capacity >= 20) || table.name.includes('Main Table')) {
                             console.log(`Deleting large/default table "${table.name}" (ID: ${table.id}, DocID: ${table.documentId}) for store ${store.name}`);
                             await strapi.entityService.delete('api::table.table', table.documentId);
                             needsRefetch = true;
@@ -60,9 +61,9 @@ export default {
                     console.log(`[Bootstrap] Creating default tables for store ${store.name} (ID: ${store.id})...`);
 
                     const defaultTables = [
-                        { name: 'テーブル1', baseCapacity: 4, maxCapacity: 6, isActive: true, type: 'table' as const },
-                        { name: 'テーブル2', baseCapacity: 4, maxCapacity: 6, isActive: true, type: 'table' as const },
-                        { name: 'テーブル3', baseCapacity: 2, maxCapacity: 4, isActive: true, type: 'table' as const },
+                        { name: 'テーブル1', capacity: 4, baseCapacity: 4, maxCapacity: 6, isActive: true, type: 'table' as const },
+                        { name: 'テーブル2', capacity: 4, baseCapacity: 4, maxCapacity: 6, isActive: true, type: 'table' as const },
+                        { name: 'テーブル3', capacity: 2, baseCapacity: 2, maxCapacity: 4, isActive: true, type: 'table' as const },
                     ];
 
                     for (const dt of defaultTables) {

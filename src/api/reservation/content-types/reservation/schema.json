@@ -5,64 +5,68 @@
         "singularName": "reservation",
         "pluralName": "reservations",
         "displayName": "Reservation",
-        "description": "予約情報"
+        "description": "予約情報（詳細モード対応）"
     },
     "options": {
         "draftAndPublish": false
     },
     "pluginOptions": {},
     "attributes": {
+        "guestName": {
+            "type": "string",
+            "required": true
+        },
+        "email": {
+            "type": "email"
+        },
+        "phone": {
+            "type": "string"
+        },
+        "date": {
+            "type": "date",
+            "required": true
+        },
         "time": {
             "type": "string",
             "required": true
         },
-        "name": {
-            "type": "string",
-            "required": true
+        "duration": {
+            "type": "integer",
+            "default": 120,
+            "min": 15
         },
         "guests": {
             "type": "integer",
             "required": true,
             "min": 1
         },
-        "duration": {
-            "type": "integer",
-            "default": 120
-        },
-        "course": {
-            "type": "string"
-        },
-        "phone": {
-            "type": "string"
-        },
-        "email": {
-            "type": "email"
-        },
-        "date": {
-            "type": "date"
-        },
-        "notes": {
-            "type": "text"
-        },
         "status": {
             "type": "enumeration",
             "enum": [
                 "pending",
                 "confirmed",
+                "rejected",
                 "canceled",
-                "completed"
+                "cancelled",
+                "completed",
+                "no_show"
             ],
-            "default": "pending"
+            "default": "pending",
+            "required": true
         },
-        "isRead": {
+        "assignedTables": {
+            "type": "relation",
+            "relation": "manyToMany",
+            "target": "api::table.table",
+            "inversedBy": "reservations"
+        },
+        "reservationNumber": {
+            "type": "string",
+            "unique": true
+        },
+        "isOwnerEntry": {
             "type": "boolean",
             "default": false
-        },
-        "store": {
-            "type": "relation",
-            "relation": "manyToOne",
-            "target": "api::store.store",
-            "inversedBy": "reservations"
         },
         "source": {
             "type": "enumeration",
@@ -79,27 +83,57 @@
         "ownerNote": {
             "type": "text"
         },
-        "requiresReview": {
-            "type": "boolean",
-            "default": false
-        },
-        "reviewReason": {
-            "type": "string"
-        },
-        "confirmedAt": {
-            "type": "datetime"
-        },
         "customer": {
             "type": "relation",
             "relation": "manyToOne",
             "target": "api::customer.customer",
             "inversedBy": "reservations"
         },
-        "assignedTables": {
+        "notes": {
+            "type": "text"
+        },
+        "course": {
+            "type": "string"
+        },
+        "language": {
+            "type": "string",
+            "default": "ja"
+        },
+        "ownerReply": {
+            "type": "text"
+        },
+        "ownerReplyTranslated": {
+            "type": "text"
+        },
+        "requiresAttention": {
+            "type": "boolean",
+            "default": false
+        },
+        "store": {
             "type": "relation",
-            "relation": "manyToMany",
-            "target": "api::table.table",
+            "relation": "manyToOne",
+            "target": "api::store.store",
             "inversedBy": "reservations"
+        },
+        "isRead": {
+            "type": "boolean",
+            "default": false
+        },
+        "confirmedAt": {
+            "type": "datetime"
+        },
+        "cancelledAt": {
+            "type": "datetime"
+        },
+        "cancelReason": {
+            "type": "string"
+        },
+        "requiresReview": {
+            "type": "boolean",
+            "default": false
+        },
+        "reviewReason": {
+            "type": "string"
         },
         "endTime": {
             "type": "time"
@@ -120,26 +154,10 @@
         "aiAdvice": {
             "type": "text"
         },
-        "language": {
-            "type": "string",
-            "default": "ja"
-        },
         "cancelToken": {
             "type": "string"
         },
-        "cancelReason": {
-            "type": "string"
-        },
-        "canceledAt": {
-            "type": "datetime"
-        },
         "notesTranslation": {
-            "type": "text"
-        },
-        "ownerReply": {
-            "type": "text"
-        },
-        "ownerReplyTranslated": {
             "type": "text"
         },
         "emailStatus": {

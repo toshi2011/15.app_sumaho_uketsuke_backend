@@ -5,7 +5,7 @@
         "singularName": "customer",
         "pluralName": "customers",
         "displayName": "Customer",
-        "description": "顧客マスタ（CRM用） "
+        "description": "顧客マスタ（CRM用）"
     },
     "options": {
         "draftAndPublish": false

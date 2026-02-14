@@ -90,7 +90,7 @@ export default {
                         id: r.id, // Numeric ID
                         documentId: r.documentId, // Document ID
                         reservationNumber: r.reservationNumber,
-                        name: r.name, // Ensure 'name' is returned matching frontend expectation
+                        name: r.guestName, // Map guestName to 'name' for frontend compatibility
                         email: r.email,
                         phone: r.phone,
                         date: r.date,
@@ -174,6 +174,7 @@ export default {
                     id: reservation.documentId,
                     reservationNumber: reservation.reservationNumber,
                     guestName: reservation.guestName,
+                    name: reservation.guestName, // Map for compatibility
                     email: reservation.email,
                     phone: reservation.phone,
                     date: reservation.date,
@@ -429,7 +430,7 @@ export default {
                             id: r.documentId,
                             reservationNumber: r.reservationNumber,
                             time: r.time,
-                            guestName: r.name,
+                            guestName: r.guestName,
                             assignedTables: r.assignedTables.map((t: any) => ({ id: t.documentId, name: t.name }))
                         })),
                         reason: `${uniqueConflicts.length} reservations conflict with this slot.`,
@@ -440,12 +441,12 @@ export default {
                     if (uniqueConflicts.length === 1) {
                         // Simple 1-on-1 swap
                         const target = uniqueConflicts[0];
-                        console.log(`[Update Debug] Swap Candidate Found: ${target.documentId} (${target.name})`);
+                        console.log(`[Update Debug] Swap Candidate Found: ${target.documentId} (${target.guestName})`);
 
                         // Optionally check if tables counts match, but for now allow strict 1-to-1 reservation swap
                         conflictResponse.action = 'swap';
                         conflictResponse.targetReservationId = target.documentId;
-                        conflictResponse.reason = `Conflict with ${target.name}. Swap seats?`;
+                        conflictResponse.reason = `Conflict with ${target.guestName}. Swap seats?`;
                     } else {
                         console.log(`[Update Debug] No Swap: Conflict count is ${uniqueConflicts.length}`);
                     }
@@ -747,9 +748,9 @@ export default {
                         data: { assignedTables: assignedIds }
                     });
                     migratedCount++;
-                    migrationLog.push(`Res ${res.id} (${res.name}, ${guests}p) -> ${assignedIds.length} seats`);
+                    migrationLog.push(`Res ${res.id} (${res.guestName}, ${guests}p) -> ${assignedIds.length} seats`);
                 } else {
-                    migrationLog.push(`Res ${res.id} (${res.name}, ${guests}p) -> FAILED. Needs manual fix.`);
+                    migrationLog.push(`Res ${res.id} (${res.guestName}, ${guests}p) -> FAILED. Needs manual fix.`);
                 }
             }
 
@@ -880,7 +881,7 @@ export default {
                         documentId: docId,
                         data: { laneIndex: lane }
                     });
-                    console.log(`[RecalcLanes] Updated ${res.name}: ${res.laneIndex} -> ${lane}`);
+                    console.log(`[RecalcLanes] Updated ${res.guestName}: ${res.laneIndex} -> ${lane}`);
                     updated++;
                 }
             }
@@ -892,7 +893,7 @@ export default {
                         documentId: docId,
                         data: { laneIndex: lane }
                     });
-                    console.log(`[RecalcLanes] Updated ${res.name}: ${res.laneIndex} -> ${lane}`);
+                    console.log(`[RecalcLanes] Updated ${res.guestName}: ${res.laneIndex} -> ${lane}`);
                     updated++;
                 }
             }

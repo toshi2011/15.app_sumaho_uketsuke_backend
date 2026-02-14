@@ -163,7 +163,7 @@ export default {
 
         // この更新が管理者によるステータス変更によるものか確認する
         // 自動承認による初期作成ではない
-        const isManualStatusChange = data?.confirmedAt || data?.canceledAt;
+        const isManualStatusChange = data?.confirmedAt || data?.canceledAt || data?.cancelledAt;
 
         // Additional check: Look at the createdAt vs updatedAt to detect if this
         // is essentially the same moment (creation with auto-confirm)
@@ -226,14 +226,8 @@ export default {
             // 返信の自動翻訳 (Ticket-10)
             let ownerReplyTranslated = null;
 
-            // Debug Log for Translation
-            if (params.data.ownerReply) {
-                strapi.log.info(`[Lifecycle:afterUpdate] Translation check: OwnerReply present. Language=${reservationWithStore.language}`);
-            }
-
             if (params.data.ownerReply && reservationWithStore.language && reservationWithStore.language !== 'ja') {
                 // Feature: Frontend might have already combined translation and original.
-                // Check if the message contains the separator (e.g., "---" or "(Original")
                 const replyText = params.data.ownerReply;
                 const isAlreadyCombined = replyText.includes('---') || replyText.includes('(Original');
 
@@ -242,7 +236,6 @@ export default {
                 } else {
                     try {
                         const { TranslationService } = require('../../../../core/services/translation');
-
                         strapi.log.info(`[Lifecycle:afterUpdate] Attempting translation to ${reservationWithStore.language}...`);
                         ownerReplyTranslated = await TranslationService.translate(params.data.ownerReply, reservationWithStore.language);
                         strapi.log.info(`[Lifecycle:afterUpdate] Owner reply translated: ${ownerReplyTranslated}`);
@@ -257,9 +250,6 @@ export default {
                 (reservationWithStore as any).ownerReplyTranslated = ownerReplyTranslated;
             }
 
-            // [Fix] Ensure the email uses the latest ownerReply from the update params
-            // DB fetch might sometimes miss the inflight update in certain transaction isolations
-            // or if the update specifically targeted ownerReply.
             if (params.data.ownerReply) {
                 reservationWithStore.ownerReply = params.data.ownerReply;
             }
@@ -272,12 +262,12 @@ export default {
                     'confirmed'
                 );
                 sent = true;
-            } else if (newStatus === 'rejected' || newStatus === 'canceled') {
+            } else if (newStatus === 'rejected' || newStatus === 'canceled' || newStatus === 'cancelled') {
                 console.log(`[Lifecycle:afterUpdate] Sending CANCELLED email for ${result.id}`);
                 emailResult = await strapi.service('api::reservation.email').sendReservationEmail(
                     reservationWithStore,
                     store,
-                    'cancelled' // Template name might still be 'cancelled'? Check email service or keep as checks
+                    'cancelled'
                 );
                 sent = true;
             }

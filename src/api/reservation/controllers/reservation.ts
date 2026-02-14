@@ -393,7 +393,7 @@ export default factories.createCoreController('api::reservation.reservation', ({
                                         id: (existing as any).documentId,
                                         time: (existing as any).time,
                                         endTime: (existing as any).endTime,
-                                        name: (existing as any).name,
+                                        name: (existing as any).guestName,
                                     }
                                 });
                             }
@@ -603,7 +603,7 @@ export default factories.createCoreController('api::reservation.reservation', ({
             time: reservation.time,
             guests: reservation.guests,
             storeName: reservation.store?.name,
-            customerName: reservation.name, // To show "Hello, [Name]"
+            customerName: reservation.guestName, // To show "Hello, [Name]"
             status: reservation.status
         };
     },

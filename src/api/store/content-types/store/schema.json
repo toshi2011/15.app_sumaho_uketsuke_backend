@@ -101,10 +101,12 @@
         },
         "lunchDuration": {
             "type": "integer",
+            "default": 60,
             "min": 30
         },
         "dinnerDuration": {
             "type": "integer",
+            "default": 90,
             "min": 30
         },
         "lunchEndTime": {
@@ -241,6 +243,20 @@
             "default": [
                 "ja"
             ]
+        },
+        "lineChannelAccessToken": {
+            "type": "text",
+            "private": true
+        },
+        "lineUserId": {
+            "type": "string",
+            "private": true
+        },
+        "store_modules": {
+            "type": "relation",
+            "relation": "oneToMany",
+            "target": "api::store-module.store-module",
+            "mappedBy": "store"
         }
     }
 }

@@ -115,7 +115,6 @@ export default {
             });
 
             // メール送信は Lifecycle Hooks (backend/src/api/reservation/content-types/reservation/lifecycles.ts) に委譲
-            // ここで送信すると二重送信になるため削除
 
             ctx.body = {
                 success: true,

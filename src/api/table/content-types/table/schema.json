@@ -16,6 +16,11 @@
             "type": "string",
             "required": true
         },
+        "capacity": {
+            "type": "integer",
+            "required": true,
+            "min": 1
+        },
         "baseCapacity": {
             "type": "integer",
             "required": true,

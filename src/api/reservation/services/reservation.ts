@@ -67,7 +67,7 @@ export default factories.createCoreService('api::reservation.reservation', ({ st
         uniqueReservations.forEach((res: any) => {
             const assignedIds = res.assignedTables?.map((t: any) => t.id) || [];
             const isCounter = res.assignedTables?.some((t: any) => counterTableIds.has(t.id));
-            console.log(`[LaneCalc] Res ${res.name}: assignedTables=${assignedIds.join(',')}, isCounter=${isCounter}`);
+            console.log(`[LaneCalc] Res ${res.guestName}: assignedTables=${assignedIds.join(',')}, isCounter=${isCounter}`);
             if (isCounter) {
                 counterReservations.push(res);
             } else {
