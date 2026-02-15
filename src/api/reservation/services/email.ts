@@ -11,9 +11,6 @@ import { AdapterFactory } from '../../../adapters/factory';
 // テンプレートのキャッシュ
 const templateCache: Map<string, handlebars.TemplateDelegate> = new Map();
 
-// Template caching and AWS configuration handled by Adapter now (AWS config moved).
-// Only template loading pertains to this service.
-
 // テンプレートを読み込み
 const loadTemplate = (templateName: string, language: string = 'ja'): handlebars.TemplateDelegate | null => {
     const cacheKey = `${language}/${templateName}`;
@@ -118,14 +115,6 @@ export default () => ({
 
         // Adapterを使用してメール送信
         const emailAdapter = AdapterFactory.getEmailAdapter();
-
-        // Note: The adapter interface currently only supports (to, subject, body).
-        // Custom "from" names like `"${store.name}" <${fromEmail}>` are not yet supported by the simple interface
-        // unless we update it. For now, we rely on the adapter's default or simplest sending mechanism.
-        // To maintain the "From" behavior seamlessly, we might need to update the interface or accept 
-        // that the adapter handles 'from' configuration centrally. 
-        // *However*, we can pass the store name in the body or subject (already done).
-        // If we strictly need dynamic sender names, we should refactor the interface later.
 
         return await emailAdapter.sendMail(
             reservation.email,

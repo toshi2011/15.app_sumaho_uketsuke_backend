@@ -70,6 +70,7 @@ $RECYCLE.BIN/
 *.sql
 *.sqlite
 *.sqlite3
+*.txt
 
 
 ############################
@@ -122,6 +123,7 @@ coverage
 ############################
 
 .env
+.env.bak
 license.txt
 exports
 .strapi
@@ -130,11 +132,30 @@ build
 .strapi-updater.json
 .strapi-cloud.json
 
-# ############################
-# # Obsidian / Notes / Scripts
-# # ############################
-note/
-scripts/
+############################
+# Obsidian / Notes / Scripts
+############################
+
+# Ignore entire note directory
+note/*
+# But keep note/issues tracked
+!note/issues/
+!note/issues/**
+
+note/.obsidian/
+note/issue_watcher.py
+backend/note/issues/起票済/
+
 build_errors.txt
 full_status.txt
+
 pg_marge3.bat
+
+############################
+# Scripts
+############################
+scripts/*.js
+*.js
+
+doc/pg_marge_back.txt
+.env.bak

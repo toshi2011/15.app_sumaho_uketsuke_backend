@@ -33,14 +33,16 @@ export default () => ({
                 };
             }
 
-            // 来店回数（confirmed + no_show は来店扱い）
+            // 来店回数を動的に算出（チケット1: 店主の操作漏れを許容）
+            // 計算式: (status === 'completed') OR (status === 'confirmed' かつ date < 今日)
+            const todayStr = new Date().toISOString().split('T')[0];
             const visitCount = reservations.filter(
-                (r) => r.status === 'confirmed' || r.status === 'no_show'
+                (r) => r.status === 'completed' || (r.status === 'confirmed' && r.date < todayStr)
             ).length;
 
             // キャンセル回数
             const cancelCount = reservations.filter(
-                (r) => r.status === 'cancelled' || r.status === 'rejected'
+                (r) => r.status === 'canceled' || r.status === 'rejected'
             ).length;
 
             // ノーショー回数
@@ -48,9 +50,9 @@ export default () => ({
                 (r) => r.status === 'no_show'
             ).length;
 
-            // 最終来店日（confirmed の最新）
+            // 最終来店日（confirmed/completed の最新）
             const confirmedReservations = reservations.filter(
-                (r) => r.status === 'confirmed'
+                (r) => r.status === 'confirmed' || r.status === 'completed'
             );
             const lastVisit = confirmedReservations.length > 0
                 ? confirmedReservations[0].date
@@ -107,8 +109,10 @@ export default () => ({
                 return null;
             }
 
+            // 来店回数を動的に算出（チケット1: 店主の操作漏れを許容）
+            const todayStr = new Date().toISOString().split('T')[0];
             const visitCount = reservations.filter(
-                (r) => r.status === 'confirmed'
+                (r) => r.status === 'completed' || (r.status === 'confirmed' && r.date < todayStr)
             ).length;
 
             const cancelCount = reservations.filter(

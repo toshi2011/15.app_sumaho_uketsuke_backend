@@ -44,6 +44,18 @@
             "relation": "manyToOne",
             "target": "api::store.store",
             "inversedBy": "customers"
+        },
+        "birthday": {
+            "type": "date"
+        },
+        "anniversaryDate": {
+            "type": "date"
+        },
+        "anniversaryTitle": {
+            "type": "string"
+        },
+        "internalNote": {
+            "type": "text"
         }
     }
 }

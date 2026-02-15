@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>예약 요청이 접수되었습니다</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+            line-height: 1.8;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 20px;
+            margin-bottom: 25px;
+        }
+
+        .header h1 {
+            color: #4CAF50;
+            font-size: 24px;
+            margin: 0;
+        }
+
+        .status-badge {
+            display: inline-block;
+            background-color: #FFA726;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin: 15px 0;
+        }
+
+        .reservation-details {
+            background-color: #f9f9f9;
+            border-left: 4px solid #4CAF50;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .reservation-details table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .reservation-details td {
+            padding: 10px 0;
+            border-bottom: 1px dashed #ddd;
+        }
+
+        .reservation-details td:first-child {
+            font-weight: bold;
+            width: 100px;
+            color: #666;
+        }
+
+        .reservation-number {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            background-color: #e8f5e9;
+            padding: 10px;
+            text-align: center;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .message {
+            background-color: #fff3e0;
+            border: 1px solid #FFB74D;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .note {
+            font-size: 14px;
+            color: #666;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+
+        .store-info {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+
+        .store-info h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            color: #333;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #888;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{{store.name}}</h1>
+        </div>
+
+        <p>{{reservation.name}} 고객님께,</p>
+
+        <p>예약 요청해 주셔서 감사합니다.</p>
+
+        <div class="status-badge">📋 확인 대기중</div>
+
+        <p>예약 요청이 접수되었습니다. 매장에서 확인 후 <strong>확정 이메일</strong>을 보내드립니다.</p>
+
+        <div class="reservation-number">
+            접수 번호: {{reservation.reservationNumber}}
+        </div>
+
+        <div class="reservation-details">
+            <table>
+                <tr>
+                    <td>날짜</td>
+                    <td>{{reservation.dateFormatted}}</td>
+                </tr>
+                <tr>
+                    <td>시간</td>
+                    <td>{{reservation.time}}</td>
+                </tr>
+                <tr>
+                    <td>인원</td>
+                    <td>{{reservation.guests}}명</td>
+                </tr>
+                {{#if reservation.course}}
+                <tr>
+                    <td>코스</td>
+                    <td>{{reservation.course}}</td>
+                </tr>
+                {{/if}}
+            </table>
+        </div>
+
+        {{#if reservation.notes}}
+        <div class="message">
+            <strong>요청사항:</strong><br>
+            {{reservation.notes}}
+        </div>
+        {{/if}}
+
+        <div class="note">
+            <strong>📌 안내 사항</strong>
+            <ul>
+                <li>이 이메일은 요청 접수를 알리는 자동 발송 메일입니다</li>
+                <li>확정 이메일을 받으신 후에 예약이 확정됩니다</li>
+                <li>일반적으로 1영업일 이내에 답변드립니다</li>
+                <li>급한 문의는 매장으로 직접 연락해 주세요</li>
+            </ul>
+        </div>
+
+        <div class="store-info">
+            <h3>매장 정보</h3>
+            <p>
+                {{store.name}}<br>
+                {{#if store.address}}📍 {{store.address}}<br>{{/if}}
+                {{#if store.phoneNumber}}📞 {{store.phoneNumber}}{{/if}}
+            </p>
+        </div>
+
+        <div class="footer">
+            <p>이 이메일은 {{store.name}} 예약 시스템에서 자동 발송되었습니다.</p>
+            <p>&copy; {{currentYear}} {{store.name}}</p>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -5,7 +5,7 @@
         "singularName": "menu-item",
         "pluralName": "menu-items",
         "displayName": "Menu Item",
-        "description": "店舗のメニュー項目"
+        "description": "店舗のメニュー項目 "
     },
     "options": {
         "draftAndPublish": true
@@ -35,6 +35,40 @@
             "relation": "manyToOne",
             "target": "api::store.store",
             "inversedBy": "menuItems"
+        },
+        "isCourse": {
+            "type": "boolean",
+            "default": false
+        },
+        "type": {
+            "type": "enumeration",
+            "enum": [
+                "course",
+                "display_only"
+            ],
+            "default": "display_only"
+        },
+        "minGuests": {
+            "type": "integer",
+            "default": 1
+        },
+        "groupOrder": {
+            "type": "boolean",
+            "default": false
+        },
+        "duration": {
+            "type": "integer",
+            "min": 60,
+            "max": 180
+        },
+        "serviceType": {
+            "type": "enumeration",
+            "enum": [
+                "common",
+                "day",
+                "night"
+            ],
+            "default": "common"
         }
     }
 }

@@ -87,6 +87,13 @@ export default {
             // 予約番号を生成
             const reservationNumber = `R-${date.replace(/-/g, '')}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
+            // 初期ステータスを決定
+            // 自動受付モードの場合は即時確定
+            let initialStatus = 'pending';
+            if (store.bookingAcceptanceMode === 'auto') {
+                initialStatus = 'confirmed';
+            }
+
             // 予約を作成
             const reservation = await strapi.db.query('api::reservation.reservation').create({
                 data: {
@@ -100,26 +107,14 @@ export default {
                     course: course || null,
                     language,
                     isOwnerEntry,
-                    status: 'pending',
+                    status: initialStatus,
                     reservationNumber,
                     duration: store.defaultDuration || 120,
                     store: store.id,
                 },
             });
 
-            // 仮受付メール送信（isOwnerEntry でなく、メールがある場合）
-            if (!isOwnerEntry && email) {
-                try {
-                    await strapi.service('api::reservation.email').sendReservationEmail(
-                        { ...reservation, email },
-                        store,
-                        'pending'
-                    );
-                    strapi.log.info(`Pending email sent for reservation ${reservationNumber}`);
-                } catch (emailError) {
-                    strapi.log.error('Failed to send pending email:', emailError);
-                }
-            }
+            // メール送信は Lifecycle Hooks (backend/src/api/reservation/content-types/reservation/lifecycles.ts) に委譲
 
             ctx.body = {
                 success: true,
@@ -130,7 +125,7 @@ export default {
                     date,
                     time,
                     guests,
-                    status: 'pending',
+                    status: initialStatus,
                 },
                 message: 'ご予約を受け付けました。確定メールをお待ちください。',
             };

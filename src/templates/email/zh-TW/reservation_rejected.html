@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>預約無法受理</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Microsoft JhengHei', sans-serif;
+            line-height: 1.8;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #f44336;
+            padding-bottom: 20px;
+            margin-bottom: 25px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 24px;
+            margin: 0;
+        }
+
+        .status-box {
+            background-color: #ffebee;
+            border: 2px solid #f44336;
+            text-align: center;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 25px 0;
+        }
+
+        .status-box h2 {
+            margin: 0;
+            color: #c62828;
+            font-size: 18px;
+        }
+
+        .reservation-details {
+            background-color: #f9f9f9;
+            border-left: 4px solid #9e9e9e;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .reservation-details table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .reservation-details td {
+            padding: 10px 0;
+            border-bottom: 1px dashed #ddd;
+        }
+
+        .reservation-details td:first-child {
+            font-weight: bold;
+            width: 100px;
+            color: #666;
+        }
+
+        .owner-message {
+            background-color: #fff3e0;
+            border: 1px solid #FFB74D;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .owner-message h4 {
+            margin: 0 0 10px 0;
+            color: #e65100;
+        }
+
+        .store-info {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+
+        .store-info h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            color: #333;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #888;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{{store.name}}</h1>
+        </div>
+
+        <p>尊敬的 {{reservation.name}}：</p>
+
+        <div class="status-box">
+            <h2>❌ 很抱歉，無法受理您的預約</h2>
+        </div>
+
+        <p>非常抱歉，我們無法接受您以下時間的預約請求：</p>
+
+        <div class="reservation-details">
+            <table>
+                <tr>
+                    <td>日期</td>
+                    <td>{{reservation.dateFormatted}}</td>
+                </tr>
+                <tr>
+                    <td>時間</td>
+                    <td>{{reservation.time}}</td>
+                </tr>
+                <tr>
+                    <td>人數</td>
+                    <td>{{reservation.guests}}位</td>
+                </tr>
+            </table>
+        </div>
+
+        {{#if reservation.ownerReply}}
+        <div class="owner-message">
+            <h4>💬 餐廳留言</h4>
+            <p>{{reservation.ownerReply}}</p>
+        </div>
+        {{else}}
+        <p>很遺憾，您所選擇的時段已滿座，無法為您安排。</p>
+        {{/if}}
+
+        <p>期待您選擇其他時間再次預約。我們隨時恭候您的光臨。</p>
+
+        <div class="store-info">
+            <h3>餐廳資訊</h3>
+            <p>
+                {{store.name}}<br>
+                {{#if store.address}}📍 {{store.address}}<br>{{/if}}
+                {{#if store.phoneNumber}}📞 {{store.phoneNumber}}{{/if}}
+            </p>
+        </div>
+
+        <div class="footer">
+            <p>此郵件由 {{store.name}} 預約系統自動發送。</p>
+            <p>&copy; {{currentYear}} {{store.name}}</p>
+        </div>
+    </div>
+</body>
+
+</html>
