@@ -50,6 +50,7 @@ const loadTemplate = (templateName: string, language: string = 'ja'): handlebars
     const templatePath = path.join(
         __dirname,
         '..',
+        '..',
         'templates',
         'email',
         language,
@@ -169,6 +170,7 @@ export const sendReservationEmail = async (
     store: any,
     type: 'pending' | 'confirmed' | 'rejected' | 'cancelled'
 ): Promise<EmailResult> => {
+    console.log(`[Service:Email] sendReservationEmail called for ${reservation.id} type=${type}`);
     if (!reservation.email) {
         return {
             success: false,

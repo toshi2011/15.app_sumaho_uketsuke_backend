@@ -46,7 +46,9 @@
                 "pending",
                 "confirmed",
                 "rejected",
+                "canceled",
                 "cancelled",
+                "completed",
                 "no_show"
             ],
             "default": "pending",
@@ -71,7 +73,10 @@
             "enum": [
                 "web",
                 "owner",
-                "phone"
+                "phone",
+                "walk_in",
+                "google",
+                "other"
             ],
             "default": "web"
         },
@@ -91,16 +96,13 @@
             "type": "string"
         },
         "language": {
-            "type": "enumeration",
-            "enum": [
-                "ja",
-                "en",
-                "zh",
-                "ko"
-            ],
+            "type": "string",
             "default": "ja"
         },
         "ownerReply": {
+            "type": "text"
+        },
+        "ownerReplyTranslated": {
             "type": "text"
         },
         "requiresAttention": {
@@ -124,6 +126,50 @@
             "type": "datetime"
         },
         "cancelReason": {
+            "type": "string"
+        },
+        "requiresReview": {
+            "type": "boolean",
+            "default": false
+        },
+        "reviewReason": {
+            "type": "string"
+        },
+        "endTime": {
+            "type": "time"
+        },
+        "laneIndex": {
+            "type": "integer"
+        },
+        "isOvernight": {
+            "type": "boolean",
+            "default": false
+        },
+        "aiAnalysisResult": {
+            "type": "json"
+        },
+        "aiReason": {
+            "type": "text"
+        },
+        "aiAdvice": {
+            "type": "text"
+        },
+        "cancelToken": {
+            "type": "string"
+        },
+        "notesTranslation": {
+            "type": "text"
+        },
+        "emailStatus": {
+            "type": "enumeration",
+            "enum": [
+                "pending",
+                "sent",
+                "failed"
+            ],
+            "default": "pending"
+        },
+        "emailError": {
             "type": "text"
         }
     }

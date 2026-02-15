@@ -21,9 +21,23 @@
             "required": true,
             "min": 1
         },
+        "baseCapacity": {
+            "type": "integer",
+            "required": true,
+            "min": 1
+        },
+        "minCapacity": {
+            "type": "integer",
+            "default": 1,
+            "min": 1
+        },
         "maxCapacity": {
             "type": "integer",
             "min": 1
+        },
+        "sortOrder": {
+            "type": "integer",
+            "default": 100
         },
         "description": {
             "type": "text"
@@ -37,6 +51,16 @@
             "relation": "manyToOne",
             "target": "api::store.store",
             "inversedBy": "tables"
+        },
+        "type": {
+            "type": "enumeration",
+            "enum": [
+                "counter",
+                "table",
+                "private"
+            ],
+            "default": "table",
+            "required": true
         },
         "reservations": {
             "type": "relation",

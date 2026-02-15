@@ -47,6 +47,13 @@
         "businessHours": {
             "type": "json"
         },
+        "assignmentPriorities": {
+            "type": "json"
+        },
+        "allowOverCapacity": {
+            "type": "boolean",
+            "default": false
+        },
         "snsLink1Label": {
             "type": "string"
         },
@@ -103,13 +110,67 @@
             "min": 30
         },
         "lunchEndTime": {
-            "type": "string",
-            "default": "14:00"
+            "type": "time"
+        },
+        "cleanUpDuration": {
+            "type": "integer",
+            "min": 0
+        },
+        "lunchCleanUp": {
+            "type": "integer",
+            "default": 0,
+            "min": 0
+        },
+        "dinnerCleanUp": {
+            "type": "integer",
+            "default": 0,
+            "min": 0
         },
         "minBookingLeadTime": {
             "type": "integer",
-            "default": 180,
+            "default": 60,
             "min": 0
+        },
+        "maxDurationLimit": {
+            "type": "integer",
+            "min": 30
+        },
+        "allowSameDayBooking": {
+            "type": "boolean",
+            "default": true
+        },
+        "sameDayCutoffTime": {
+            "type": "time"
+        },
+        "bookingClosingRule": {
+            "type": "enumeration",
+            "enum": [
+                "strict_closing",
+                "last_order_limit"
+            ],
+            "default": "last_order_limit"
+        },
+        "dynamicDurationRate": {
+            "type": "integer",
+            "default": 10,
+            "min": 0
+        },
+        "rejectionStrategy": {
+            "type": "enumeration",
+            "enum": [
+                "call_request",
+                "auto_reject"
+            ],
+            "default": "call_request"
+        },
+        "bookingAcceptanceMode": {
+            "type": "enumeration",
+            "enum": [
+                "auto",
+                "manual_if_notes",
+                "manual"
+            ],
+            "default": "auto"
         },
         "menuItems": {
             "type": "relation",
@@ -165,17 +226,23 @@
             "target": "api::reservation.reservation",
             "mappedBy": "store"
         },
+        "customers": {
+            "type": "relation",
+            "relation": "oneToMany",
+            "target": "api::customer.customer",
+            "mappedBy": "store"
+        },
         "tables": {
             "type": "relation",
             "relation": "oneToMany",
             "target": "api::table.table",
             "mappedBy": "store"
         },
-        "customers": {
-            "type": "relation",
-            "relation": "oneToMany",
-            "target": "api::customer.customer",
-            "mappedBy": "store"
+        "supportedLanguages": {
+            "type": "json",
+            "default": [
+                "ja"
+            ]
         },
         "lineChannelAccessToken": {
             "type": "text",

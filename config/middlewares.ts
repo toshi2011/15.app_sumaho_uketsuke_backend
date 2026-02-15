@@ -2,7 +2,16 @@ export default [
   'strapi::logger',
   'strapi::errors',
   'strapi::security',
-  'strapi::cors',
+  {
+    name: 'strapi::cors',
+    config: {
+      origin: ['*'],
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'],
+      headers: ['Content-Type', 'Authorization', 'Origin', 'Accept', 'x-store-id'],
+      keepHeaderOnError: true,
+    },
+  },
+  'global::store-context',
   'strapi::poweredBy',
   'strapi::query',
   {

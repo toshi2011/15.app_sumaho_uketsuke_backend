@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>预约已确认</title>
+    <style>
+        body {
+            font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            line-height: 1.8;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 20px;
+            margin-bottom: 25px;
+        }
+
+        .header h1 {
+            color: #4CAF50;
+            font-size: 24px;
+            margin: 0;
+        }
+
+        .confirmation-box {
+            background-color: #4CAF50;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 25px 0;
+        }
+
+        .confirmation-box h2 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .reservation-details {
+            background-color: #e8f5e9;
+            border-left: 4px solid #4CAF50;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .reservation-details table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .reservation-details td {
+            padding: 10px 0;
+            border-bottom: 1px dashed #c8e6c9;
+        }
+
+        .reservation-details td:first-child {
+            font-weight: bold;
+            width: 100px;
+            color: #2e7d32;
+        }
+
+        .reservation-number {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            background-color: #e8f5e9;
+            padding: 10px;
+            text-align: center;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            border: 2px solid #4CAF50;
+        }
+
+        .owner-message {
+            background-color: #e3f2fd;
+            border: 1px solid #64B5F6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .owner-message h4 {
+            margin: 0 0 10px 0;
+            color: #1976D2;
+        }
+
+        .table-info {
+            background-color: #fff8e1;
+            border: 1px solid #FFD54F;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .table-info strong {
+            font-size: 18px;
+            color: #f57c00;
+        }
+
+        .note {
+            font-size: 14px;
+            color: #666;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #888;
+            font-size: 12px;
+        }
+
+        .store-info {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+
+        .store-info h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            color: #333;
+        }
+
+        .cancel-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .cancel-link a {
+            color: #999;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{{store.name}}</h1>
+        </div>
+        <p>{{reservation.name}} 您好</p>
+        <div class="confirmation-box">
+            <h2>✅ 预约已确认</h2>
+        </div>
+        <p>感谢您的预约。您的预约已确认如下。</p>
+        <div class="reservation-number">
+            预约编号: {{reservation.reservationNumber}}
+        </div>
+        <div class="reservation-details">
+            <table>
+                <tr>
+                    <td>日期</td>
+                    <td><strong>{{reservation.dateFormatted}}</strong></td>
+                </tr>
+                <tr>
+                    <td>时间</td>
+                    <td><strong>{{reservation.time}}</strong></td>
+                </tr>
+                <tr>
+                    <td>人数</td>
+                    <td><strong>{{reservation.guests}}位</strong></td>
+                </tr>
+                {{#if reservation.course}}<tr>
+                    <td>套餐</td>
+                    <td>{{reservation.course}}</td>
+                </tr>{{/if}}
+            </table>
+        </div>
+        {{#if reservation.assignedTablesText}}
+        <div class="table-info">🪑 座位: <strong>{{reservation.assignedTablesText}}</strong></div>
+        {{/if}}
+        {{#if reservation.ownerReply}}
+        <div class="owner-message">
+            <h4>💬 店铺留言</h4>
+            <p>{{reservation.ownerReply}}</p>
+        </div>
+        {{/if}}
+        <div class="note">
+            <strong>📌 注意事项</strong>
+            <ul>
+                <li>请在预约时间前5分钟到达</li>
+                <li>请告知预约编号以便顺利入座</li>
+                <li>若需取消或更改，请提前联系</li>
+            </ul>
+        </div>
+        <div class="store-info">
+            <h3>店铺资讯</h3>
+            <p>
+                {{store.name}}<br>
+                {{#if store.address}}📍 {{store.address}}<br>{{/if}}
+                {{#if store.phoneNumber}}📞 {{store.phoneNumber}}{{/if}}
+            </p>
+        </div>
+        {{#if cancellationUrl}}
+        <div class="confirmation-box"
+            style="background-color: #fff0f5; border: 1px dashed #ff69b4; color: #333; margin-top: 30px;">
+            <h3 style="color: #d81b60; margin: 0 0 10px 0;">计划赶不上变化？</h3>
+            <p style="font-size: 14px; margin-bottom: 15px;">是不是沉迷于美景忘了时间？🥟</p>
+
+            <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                    <td align="center">
+                        <table border="0" cellspacing="0" cellpadding="0">
+                            <tr>
+                                <td align="center" style="border-radius: 20px;" bgcolor="#d81b60">
+                                    <a href="{{{cancellationUrl}}}" target="_blank"
+                                        style="font-size: 16px; font-family: Helvetica, Arial, sans-serif; color: #ffffff; text-decoration: none; padding: 10px 20px; border-radius: 20px; border: 1px solid #d81b60; display: inline-block; font-weight: bold;">
+                                        取消预约
+                                    </a>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+
+            <p style="font-size: 12px; margin-top: 15px; color: #888;">
+                如果按钮无法点击:<br>
+                <a href="{{{cancellationUrl}}}" style="color: #d81b60;">{{{cancellationUrl}}}</a>
+            </p>
+        </div>
+        {{/if}}
+
+        <div class="footer">
+            <p>This email was sent automatically from {{store.name}}.</p>
+            <p>&copy; {{currentYear}} {{store.name}}</p>
+        </div>
+    </div>
+</body>
+
+</html>

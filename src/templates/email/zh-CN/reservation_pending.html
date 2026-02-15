@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>预约请求已收到</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Microsoft YaHei', sans-serif;
+            line-height: 1.8;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 20px;
+            margin-bottom: 25px;
+        }
+
+        .header h1 {
+            color: #4CAF50;
+            font-size: 24px;
+            margin: 0;
+        }
+
+        .status-badge {
+            display: inline-block;
+            background-color: #FFA726;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin: 15px 0;
+        }
+
+        .reservation-details {
+            background-color: #f9f9f9;
+            border-left: 4px solid #4CAF50;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .reservation-details table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .reservation-details td {
+            padding: 10px 0;
+            border-bottom: 1px dashed #ddd;
+        }
+
+        .reservation-details td:first-child {
+            font-weight: bold;
+            width: 100px;
+            color: #666;
+        }
+
+        .reservation-number {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            background-color: #e8f5e9;
+            padding: 10px;
+            text-align: center;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .message {
+            background-color: #fff3e0;
+            border: 1px solid #FFB74D;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .note {
+            font-size: 14px;
+            color: #666;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+
+        .store-info {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+
+        .store-info h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            color: #333;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #888;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{{store.name}}</h1>
+        </div>
+
+        <p>尊敬的 {{reservation.name}}：</p>
+
+        <p>感谢您的预约请求。</p>
+
+        <div class="status-badge">📋 等待确认</div>
+
+        <p>我们已收到您的预约请求。餐厅确认后会发送<strong>确认邮件</strong>给您。</p>
+
+        <div class="reservation-number">
+            参考号: {{reservation.reservationNumber}}
+        </div>
+
+        <div class="reservation-details">
+            <table>
+                <tr>
+                    <td>日期</td>
+                    <td>{{reservation.dateFormatted}}</td>
+                </tr>
+                <tr>
+                    <td>时间</td>
+                    <td>{{reservation.time}}</td>
+                </tr>
+                <tr>
+                    <td>人数</td>
+                    <td>{{reservation.guests}}位</td>
+                </tr>
+                {{#if reservation.course}}
+                <tr>
+                    <td>套餐</td>
+                    <td>{{reservation.course}}</td>
+                </tr>
+                {{/if}}
+            </table>
+        </div>
+
+        {{#if reservation.notes}}
+        <div class="message">
+            <strong>您的特殊要求：</strong><br>
+            {{reservation.notes}}
+        </div>
+        {{/if}}
+
+        <div class="note">
+            <strong>📌 温馨提示</strong>
+            <ul>
+                <li>这是一封自动确认您请求的邮件</li>
+                <li>收到确认邮件后您的预约才正式生效</li>
+                <li>我们通常会在1个工作日内回复</li>
+                <li>如有紧急需求，请直接联系餐厅</li>
+            </ul>
+        </div>
+
+        <div class="store-info">
+            <h3>餐厅信息</h3>
+            <p>
+                {{store.name}}<br>
+                {{#if store.address}}📍 {{store.address}}<br>{{/if}}
+                {{#if store.phoneNumber}}📞 {{store.phoneNumber}}{{/if}}
+            </p>
+        </div>
+
+        <div class="footer">
+            <p>此邮件由 {{store.name}} 预约系统自动发送。</p>
+            <p>&copy; {{currentYear}} {{store.name}}</p>
+        </div>
+    </div>
+</body>
+
+</html>

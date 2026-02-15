@@ -4,4 +4,4 @@
 
 import { factories } from '@strapi/strapi';
 
-export default factories.createCoreService('api::table.table');
+export default factories.createCoreService('api::table.table' as any);
