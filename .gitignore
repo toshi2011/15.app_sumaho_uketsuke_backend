@@ -130,12 +130,11 @@ build
 .strapi-updater.json
 .strapi-cloud.json
 
-############################
-# Obsidian
-############################
-
-note/.obsidian/
-note/issue_watcher.py
-
-backend/note/issues/起票済/
+# ############################
+# # Obsidian / Notes / Scripts
+# # ############################
+note/
+scripts/
+build_errors.txt
+full_status.txt
 pg_marge3.bat
