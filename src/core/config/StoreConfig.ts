@@ -4,17 +4,21 @@ import { timeToMinutes } from '../../utils/timeUtils';
 // 店舗設定 (StoreConfig) 項目説明
 // ==========================================
 //
-// --- 時間設定 (Durations) ---
-// lunchDuration      : ランチ平均滞在時間 (分) - ランチタイム予約のデフォルト所要時間
-// dinnerDuration     : ディナー平均滞在時間 (分) - ディナータイム予約のデフォルト所要時間
+// --- Ticket-07: TimeSlot 抽象化 ---
+// slots              : 全てのサービス時間枠（モーニング/ランチ/ディナー等）の配列
+//                      各枠はid, 開始/終了(分), デフォルト滞在時間, 優先度, 有効フラグを持つ
+//
+// --- 時間設定 (Durations) --- (後方互換、@deprecated)
+// lunchDuration      : ランチ平均滞在時間 (分) → slots[id='lunch'].duration を使用
+// dinnerDuration     : ディナー平均滞在時間 (分) → slots[id='dinner'].duration を使用
 // cleanupDuration    : 片付け時間 (分) - 予約間のバッファ時間 (現在は0固定)
 // maxDuration        : 最大滞在時間 (分) - 予約の最大長さ制限
 //
-// --- 営業時間境界 (Business Hours Boundaries) ---
-// lunchStartMin      : ランチ開始時間 (分換算)
-// lunchEndMin        : ランチ終了時間 (分換算)
-// dinnerStartMin     : ディナー開始時間 (分換算)
-// dinnerEndMin       : ディナー終了時間 (分換算)
+// --- 営業時間境界 (Business Hours Boundaries) --- (後方互換、@deprecated)
+// lunchStartMin      : ランチ開始時間 (分換算) → slots[id='lunch'].startMin を使用
+// lunchEndMin        : ランチ終了時間 (分換算) → slots[id='lunch'].endMin を使用
+// dinnerStartMin     : ディナー開始時間 (分換算) → slots[id='dinner'].startMin を使用
+// dinnerEndMin       : ディナー終了時間 (分換算) → slots[id='dinner'].endMin を使用
 //
 // --- ルール (Rules) ---
 // lastOrderOffset    : ラストオーダー前倒し時間 (分) - 閉店時間の何分前まで予約を受け付けるか
@@ -29,18 +33,56 @@ export interface ConfigValue<T> {
     source: ConfigSource;
 }
 
+/**
+ * Ticket-07: サービス時間枠を表す汎用インターフェース
+ * ランチ/ディナーに限定せず、モーニングや将来の時間帯にも対応
+ */
+export interface TimeSlot {
+    /** スロット識別子（'morning', 'lunch', 'dinner' など） */
+    id: string;
+    /** 表示名（'モーニング', 'ランチ', 'ディナー'） */
+    label: string;
+    /** 営業開始（0時からの分換算） */
+    startMin: number;
+    /** 営業終了（0時からの分換算、深夜営業の場合は+1440） */
+    endMin: number;
+    /** この枠のデフォルト滞在時間（分） */
+    duration: number;
+    /** true=名前付きスロット（lunch等）、false=base枠。重複時にこちらを優先 */
+    isPriority: boolean;
+    /** 有効/無効フラグ */
+    isEnabled: boolean;
+}
+
+/** TimeSlot のラベルマッピング */
+const SLOT_LABELS: Record<string, string> = {
+    base: '通し営業',
+    morning: 'モーニング',
+    lunch: 'ランチ',
+    dinner: 'ディナー',
+};
+
 // 解決済みの設定値インターフェース
 export interface ResolvedStoreConfig {
-    // 時間設定
+    // Ticket-07: TimeSlot 配列（新規・推奨）
+    /** 全サービス時間枠の配列。新規コードはこちらを使用すること */
+    slots: TimeSlot[];
+
+    // --- 後方互換フィールド（@deprecated） ---
+    /** @deprecated slots[id='lunch'].duration を使用してください */
     lunchDuration: number;
+    /** @deprecated slots[id='dinner'].duration を使用してください */
     dinnerDuration: number;
     cleanupDuration: number;
     maxDuration: number;
 
-    // 営業時間境界 (分換算)
+    /** @deprecated slots[id='lunch'].startMin を使用してください */
     lunchStartMin: number;
+    /** @deprecated slots[id='lunch'].endMin を使用してください */
     lunchEndMin: number;
+    /** @deprecated slots[id='dinner'].startMin を使用してください */
     dinnerStartMin: number;
+    /** @deprecated slots[id='dinner'].endMin を使用してください */
     dinnerEndMin: number;
 
     // ルール
@@ -67,12 +109,15 @@ export interface ResolvedStoreConfig {
 // システムデフォルト値 (定数定義)
 const DEFAULTS = {
     // 時間文字列 (Time Strings)
+    MORNING_START: "07:00",
+    MORNING_END: "10:00",
     LUNCH_START: "11:00",
     LUNCH_END: "15:00",
     DINNER_START: "18:00",
     DINNER_END: "23:00",
 
     // 所要時間 (分) (Durations)
+    MORNING_DURATION: 45,
     LUNCH_DURATION: 60,
     DINNER_DURATION: 75,
     CLEANUP: 0,
@@ -162,14 +207,87 @@ export const StoreConfig = {
             DEFAULTS.LOOSE_MATCH_MAX_WASTED_SEATS
         );
 
+        // === Ticket-07: TimeSlot 配列の生成 ===
+        const lunchStartMinVal = resolveTime(lunchStartStr, DEFAULTS.LUNCH_START);
+        const lunchEndMinVal = resolveTime(lunchEndStr, DEFAULTS.LUNCH_END);
+
+        const slots: TimeSlot[] = [];
+
+        // Ticket-10: 基本営業時間（通し営業）
+        // isPriority: false とし、morning/lunch/dinner と重複する時間帯では名前付きスロットを優先
+        if (bh.base && bh.base.isEnabled) {
+            const baseStartStr = bh.base.start || '08:00';
+            const baseEndStr = bh.base.end || '22:00';
+            const baseDuration = resolveNum(
+                safeStore.baseDuration || bh.base.duration,
+                DEFAULTS.LUNCH_DURATION  // 通し営業のデフォルトはランチ相当
+            );
+            slots.push({
+                id: 'base',
+                label: SLOT_LABELS['base'] || '通し営業',
+                startMin: resolveTime(baseStartStr, '08:00'),
+                endMin: resolveTime(baseEndStr, '22:00'),
+                duration: baseDuration.value,
+                isPriority: false,
+                isEnabled: true,
+            });
+        }
+
+        // モーニング（businessHoursに morning キーがある場合のみ生成）
+        if (bh.morning) {
+            const morningStartStr = bh.morning.start || DEFAULTS.MORNING_START;
+            const morningEndStr = bh.morning.end || DEFAULTS.MORNING_END;
+            const morningDuration = resolveNum(
+                safeStore.morningDuration || bh.morning.duration,
+                DEFAULTS.MORNING_DURATION
+            );
+            slots.push({
+                id: 'morning',
+                label: SLOT_LABELS['morning'] || 'モーニング',
+                startMin: resolveTime(morningStartStr, DEFAULTS.MORNING_START),
+                endMin: resolveTime(morningEndStr, DEFAULTS.MORNING_END),
+                duration: morningDuration.value,
+                isPriority: true,
+                isEnabled: bh.morning.isEnabled !== false,
+            });
+        }
+
+        // ランチ（デフォルトで生成。businessHoursにlunchキーがない場合もデフォルト値で生成）
+        const lunchIsEnabled = bh.lunch ? bh.lunch.isEnabled !== false : true;
+        slots.push({
+            id: 'lunch',
+            label: SLOT_LABELS['lunch'] || 'ランチ',
+            startMin: lunchStartMinVal,
+            endMin: lunchEndMinVal,
+            duration: lunchDuration.value,
+            isPriority: true,
+            isEnabled: lunchIsEnabled,
+        });
+
+        // ディナー（デフォルトで生成。businessHoursにdinnerキーがない場合もデフォルト値で生成）
+        const dinnerIsEnabled = bh.dinner ? bh.dinner.isEnabled !== false : true;
+        slots.push({
+            id: 'dinner',
+            label: SLOT_LABELS['dinner'] || 'ディナー',
+            startMin: dinnerStartMin,
+            endMin: dinnerEndMin,
+            duration: dinnerDuration.value,
+            isPriority: true,
+            isEnabled: dinnerIsEnabled,
+        });
+
         return {
+            // Ticket-07: TimeSlot 配列（推奨）
+            slots,
+
+            // 後方互換フィールド（@deprecated）
             lunchDuration: lunchDuration.value,
             dinnerDuration: dinnerDuration.value,
             cleanupDuration: DEFAULTS.CLEANUP, // 固定
             maxDuration: maxDuration.value,
 
-            lunchStartMin: resolveTime(lunchStartStr, DEFAULTS.LUNCH_START),
-            lunchEndMin: resolveTime(lunchEndStr, DEFAULTS.LUNCH_END),
+            lunchStartMin: lunchStartMinVal,
+            lunchEndMin: lunchEndMinVal,
             dinnerStartMin: dinnerStartMin,
             dinnerEndMin: dinnerEndMin,
 
@@ -193,20 +311,49 @@ export const StoreConfig = {
     },
 
     /**
+     * Ticket-07: 指定時刻がどの有効なTimeSlotに属するか判定する
+     * 複数該当時は isPriority=true の枠を優先
+     * @param timeStr 時間文字列 "HH:mm"
+     * @param config ResolvedStoreConfig
+     * @returns 該当するTimeSlot、またはnull（どの枠にも属さない場合）
+     */
+    resolveSlot: (timeStr: string, config: ResolvedStoreConfig): TimeSlot | null => {
+        const min = timeToMinutes(timeStr);
+        // 有効なスロットのみ検索
+        const enabledSlots = config.slots.filter(s => s.isEnabled);
+
+        // まず isPriority=true のスロットからマッチを探す
+        const priorityMatch = enabledSlots.find(
+            s => s.isPriority && min >= s.startMin && min < s.endMin
+        );
+        if (priorityMatch) return priorityMatch;
+
+        // 次に isPriority=false のスロットからマッチを探す
+        const baseMatch = enabledSlots.find(
+            s => !s.isPriority && min >= s.startMin && min < s.endMin
+        );
+        return baseMatch || null;
+    },
+
+    /**
      * ヘルパー: 指定された時間(HH:mm)がランチタイムかどうかを判定
+     * Ticket-07: 内部実装をslotsベースに変更（シグネチャ維持、後方互換）
      */
     isLunch: (timeStr: string, config: ResolvedStoreConfig): boolean => {
-        const min = timeToMinutes(timeStr);
-        return min >= config.lunchStartMin && min < config.lunchEndMin;
+        const slot = StoreConfig.resolveSlot(timeStr, config);
+        return slot?.id === 'lunch';
     },
 
     /**
      * ヘルパー: Configに基づいて、指定時間の標準所要時間を取得
+     * Ticket-07: 内部実装をslotsベースに変更（シグネチャ維持、後方互換）
      */
     getStandardDuration: (timeStr: string, config: ResolvedStoreConfig): number => {
-        if (StoreConfig.isLunch(timeStr, config)) {
-            return config.lunchDuration;
+        const slot = StoreConfig.resolveSlot(timeStr, config);
+        if (slot) {
+            return slot.duration;
         }
+        // どのスロットにも属さない場合はディナーdurationにフォールバック
         return config.dinnerDuration;
     }
 };

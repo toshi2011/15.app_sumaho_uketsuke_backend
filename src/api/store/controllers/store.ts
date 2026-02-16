@@ -59,10 +59,18 @@ export default factories.createCoreController('api::store.store', ({ strapi }) =
         const guestsNum = parseInt(String(guests || '2'), 10);
 
         try {
-            // 店舗情報を取得
-            const store = await strapi.entityService.findOne('api::store.store', id, {
+            // 店舗情報を取得（documentIdでの検索に対応）
+            let store = await strapi.entityService.findOne('api::store.store', id, {
                 populate: '*'
             });
+
+            // Strapi v5: documentIdでの検索フォールバック
+            if (!store) {
+                store = await strapi.db.query('api::store.store').findOne({
+                    where: { documentId: id },
+                    populate: true
+                });
+            }
 
             if (!store) {
                 return ctx.notFound('Store not found');
@@ -87,6 +95,9 @@ export default factories.createCoreController('api::store.store', ({ strapi }) =
             const storeService = strapi.service('api::store.store');
             const slots: AvailableSlot[] = await Promise.all(
                 timeSlots.map(async (time: string) => {
+                    // Ticket-09: 該当するスロットを判定
+                    const applicableSlot = StoreDomain.getApplicableSlot(time, config);
+
                     const result = await (storeService as any).checkAvailability(
                         id,
                         date,
@@ -107,7 +118,9 @@ export default factories.createCoreController('api::store.store', ({ strapi }) =
                         status,
                         capacityUsed: result.capacityUsed || 0,
                         action: result.action || (result.available ? 'proceed' : 'reject'),
-                        reason: result.reason || ''
+                        reason: result.reason || '',
+                        slotId: applicableSlot?.id,
+                        slotLabel: applicableSlot?.label,
                     };
                 })
             );

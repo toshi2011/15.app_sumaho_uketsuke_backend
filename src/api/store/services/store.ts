@@ -37,7 +37,7 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
             const menuItems = (store as any).menuItems || [];
 
             // === コース要件の検証 (minGuests等) ===
-            const courseCheck = StoreDomain.validateCourseRequirements(courseId, menuItems, guests);
+            const courseCheck = StoreDomain.validateCourseRequirements(courseId, menuItems, guests, time, config);
             if (!courseCheck.valid) {
                 return {
                     available: false,

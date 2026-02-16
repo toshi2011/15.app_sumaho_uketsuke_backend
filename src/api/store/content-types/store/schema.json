@@ -99,6 +99,11 @@
             "default": 90,
             "min": 30
         },
+        "morningDuration": {
+            "type": "integer",
+            "default": 45,
+            "min": 15
+        },
         "lunchDuration": {
             "type": "integer",
             "default": 60,

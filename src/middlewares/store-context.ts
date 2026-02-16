@@ -20,11 +20,18 @@ export default (config, { strapi }: { strapi: Core.Strapi }) => {
                 if (!ctx.query) ctx.query = {};
                 if (!ctx.query.filters) ctx.query.filters = {};
 
-                // Merge store filter
-                // Note: We cast to any to avoid strict type checks on dynamic query object
-                (ctx.query.filters as any).store = { documentId: storeId };
+                // FIX: If store filter is already present in query (e.g. from frontend API),
+                // do NOT override it with x-store-id header.
+                const existingStoreFilter = (ctx.query.filters as any).store;
 
-                strapi.log.info(`[StoreContext] Auto-injected filter for Store: ${storeId}`);
+                if (!existingStoreFilter) {
+                    // Merge store filter
+                    // Note: We cast to any to avoid strict type checks on dynamic query object
+                    (ctx.query.filters as any).store = { documentId: storeId };
+                    strapi.log.info(`[StoreContext] Auto-injected filter for Store: ${storeId}`);
+                } else {
+                    strapi.log.debug(`[StoreContext] Skipping auto-injection: explicit store filter found in query.`);
+                }
             }
         }
 
