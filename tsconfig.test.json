@@ -1,0 +1,23 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "types": [
+            "jest"
+        ],
+        "noEmit": true
+    },
+    "include": [
+        "src/**/*.test.ts",
+        "src/**/*.ts"
+    ],
+    "exclude": [
+        "node_modules/",
+        "build/",
+        "dist/",
+        ".cache/",
+        ".tmp/",
+        "src/admin/",
+        "src/plugins/**",
+        "scripts/"
+    ]
+}

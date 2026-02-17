@@ -35,13 +35,21 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
     "@types/mime-types": "^3.0.1",
     "@types/node": "^20",
     "@types/node-fetch": "^2.6.13",
     "@types/nodemailer": "^7.0.4",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+<<<<<<< HEAD
     "node-fetch": "^2.7.0",
+=======
+    "@types/uuid": "^10.0.0",
+    "jest": "^30.2.0",
+    "node-fetch": "^2.7.0",
+    "ts-jest": "^29.4.6",
+>>>>>>> feature/timeslot-refactor
     "ts-node": "^10.9.2",
     "typescript": "^5"
   },

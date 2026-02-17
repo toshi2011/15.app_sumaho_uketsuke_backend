@@ -1,5 +1,5 @@
 import { timeToMinutes } from '../../utils/timeUtils';
-import { StoreConfig, ResolvedStoreConfig } from '../config/StoreConfig';
+import { StoreConfig, ResolvedStoreConfig, TimeSlot } from '../config/StoreConfig';
 
 // ==========================================
 // StoreDomain - 店舗ビジネスロジック
@@ -47,6 +47,10 @@ export interface AvailableSlot {
     capacityUsed: number;
     action?: 'proceed' | 'reject' | 'call_store' | 'pending_review';
     reason?: string;
+    /** Ticket-09: 該当する営業スロットのID（例: 'lunch', 'dinner', 'morning'） */
+    slotId?: string;
+    /** Ticket-09: 該当する営業スロットの表示名（例: 'ランチ', 'ディナー'） */
+    slotLabel?: string;
 }
 
 /**
@@ -165,28 +169,73 @@ export const StoreDomain = {
     },
 
     /**
+     * Ticket-07: 指定時刻がどのTimeSlotに属するか判定
+     * 複数該当時はisPriority=true の枠を優先
+     * @param slots TimeSlot配列
+     * @param timeMin 時刻（分換算）
+     * @returns 該当するTimeSlot、またはnull
+     */
+    resolveSlotForTime: (slots: TimeSlot[], timeMin: number): TimeSlot | null => {
+        // 有効なスロットのみ検索
+        const enabledSlots = slots.filter(s => s.isEnabled);
+
+        // まず isPriority=true のスロットからマッチを探す
+        const priorityMatch = enabledSlots.find(
+            s => s.isPriority && timeMin >= s.startMin && timeMin < s.endMin
+        );
+        if (priorityMatch) return priorityMatch;
+
+        // 次に isPriority=false のスロットからマッチを探す
+        const baseMatch = enabledSlots.find(
+            s => !s.isPriority && timeMin >= s.startMin && timeMin < s.endMin
+        );
+        return baseMatch || null;
+    },
+
+    /**
+     * Ticket-08: 指定時刻がどのサービス時間枠に属するかを判定する（高レベルAPI）
+     * resolveSlotForTime の便利ラッパー。時間文字列とconfigを受け取り、
+     * 内部で分換算とslots抽出を行う。
+     *
+     * 優先順位: 重複している場合、isPriority: true（特定の食事時間帯）の設定を優先する
+     * （例：BaseとLunchが重なっていたらLunchの設定を採用）
+     *
+     * @param time 時間文字列 "HH:mm"
+     * @param config ResolvedStoreConfig
+     * @returns 該当するTimeSlot、またはnull（どの営業枠にも属さない場合）
+     */
+    getApplicableSlot: (time: string, config: ResolvedStoreConfig): TimeSlot | null => {
+        const min = timeToMinutes(time);
+        return StoreDomain.resolveSlotForTime(config.slots, min);
+    },
+
+    /**
      * 指定された時間帯の所要時間を取得
+     * Ticket-07: slotsベースに変更。該当スロットのdurationを返す
      * @param timeStr 時間文字列 "HH:mm"
      * @param config ResolvedStoreConfig
      * @returns 所要時間（分）
      */
     getDuration: (timeStr: string, config: ResolvedStoreConfig): number => {
         const min = timeToMinutes(timeStr);
-        if (min >= config.lunchStartMin && min < config.lunchEndMin) {
-            return config.lunchDuration;
+        const slot = StoreDomain.resolveSlotForTime(config.slots, min);
+        if (slot) {
+            return slot.duration;
         }
+        // フォールバック: どのスロットにも属さない場合はdinnerDuration
         return config.dinnerDuration;
     },
 
     /**
      * 時間帯がランチかどうかを判定
+     * @deprecated Ticket-08: getApplicableSlot() を使用し、slot.id === 'lunch' で判定してください
      * @param timeStr 時間文字列 "HH:mm"
      * @param config ResolvedStoreConfig
      * @returns ランチタイムなら true
      */
     isLunchTime: (timeStr: string, config: ResolvedStoreConfig): boolean => {
-        const min = timeToMinutes(timeStr);
-        return min >= config.lunchStartMin && min < config.lunchEndMin;
+        const slot = StoreDomain.getApplicableSlot(timeStr, config);
+        return slot?.id === 'lunch';
     },
 
     /**
@@ -319,7 +368,7 @@ export const StoreDomain = {
 
     /**
      * 営業時間から予約可能な時間スロットを生成
-     * フロントエンドで計算していたロジックをバックエンドに集約
+     * Ticket-07: config.slots ベースに変更。lunch/dinner固定ロジックを廃止
      * @param config ResolvedStoreConfig
      * @param date 対象日付 "YYYY-MM-DD"
      * @param store 生の店舗オブジェクト（businessHours取得用）
@@ -327,9 +376,44 @@ export const StoreDomain = {
      */
     generateTimeSlots: (config: ResolvedStoreConfig, date: string, store: any): string[] => {
         const businessHours = store?.businessHours;
-        if (!businessHours) {
-            // フォールバック: デフォルト営業時間
-            const slots: string[] = [];
+
+        // 1. 定休日チェック
+        if (businessHours) {
+            const d = new Date(date);
+            const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+
+            const holidays = businessHours.holidays || [];
+            if (holidays.includes(dayOfWeek)) {
+                return []; // 定休日
+            }
+
+            // 2. 臨時休業チェック
+            const irregularHolidays = businessHours.irregularHolidays || [];
+            if (irregularHolidays.includes(date)) {
+                return []; // 臨時休業
+            }
+        }
+
+        const slots: string[] = [];
+
+        // 分換算の開始/終了から15分間隔でスロットを生成するヘルパー
+        const addSlotsFromMinutes = (startMin: number, endMin: number) => {
+            let currentMin = startMin;
+            while (currentMin < endMin) {
+                // 深夜営業（1440超え）の場合は実時間に戻す
+                const displayMin = currentMin >= 1440 ? currentMin - 1440 : currentMin;
+                const h = Math.floor(displayMin / 60);
+                const m = displayMin % 60;
+                slots.push(`${h}:${m.toString().padStart(2, '0')}`);
+                currentMin += 15;
+            }
+        };
+
+        // config.slots から有効なスロットの時間を生成
+        const enabledSlots = config.slots.filter(s => s.isEnabled);
+
+        if (enabledSlots.length === 0) {
+            // フォールバック: 有効スロットがない場合はデフォルト営業時間
             for (let h = 11; h <= 20; h++) {
                 for (let m = 0; m < 60; m += 15) {
                     if (h === 20 && m > 0) break;
@@ -339,56 +423,8 @@ export const StoreDomain = {
             return slots;
         }
 
-        const d = new Date(date);
-        const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
-
-        // 1. 定休日チェック
-        const holidays = businessHours.holidays || [];
-        if (holidays.includes(dayOfWeek)) {
-            return []; // 定休日
-        }
-
-        // 2. 臨時休業チェック
-        const irregularHolidays = businessHours.irregularHolidays || [];
-        if (irregularHolidays.includes(date)) {
-            return []; // 臨時休業
-        }
-
-        const slots: string[] = [];
-
-        const addSlots = (start: string, end: string) => {
-            if (!start || !end) return;
-            const [startH, startM] = start.split(':').map(Number);
-            const [endH, endM] = end.split(':').map(Number);
-
-            let currentH = startH;
-            let currentM = startM;
-            const endTotal = endH * 60 + endM;
-
-            while (true) {
-                const currentTotal = currentH * 60 + currentM;
-                if (currentTotal >= endTotal) break;
-
-                slots.push(`${currentH}:${currentM.toString().padStart(2, '0')}`);
-
-                currentM += 15;
-                if (currentM >= 60) {
-                    currentH += 1;
-                    currentM = 0;
-                }
-            }
-        };
-
-        // ランチ営業
-        const lunch = businessHours.lunch;
-        if (lunch && lunch.isEnabled !== false) {
-            addSlots(lunch.start || '11:00', lunch.end || '14:00');
-        }
-
-        // ディナー営業
-        const dinner = businessHours.dinner;
-        if (dinner && dinner.isEnabled !== false) {
-            addSlots(dinner.start || '17:00', dinner.end || '23:00');
+        for (const slot of enabledSlots) {
+            addSlotsFromMinutes(slot.startMin, slot.endMin);
         }
 
         // 重複排除＆ソート
@@ -466,7 +502,9 @@ export const StoreDomain = {
 
         // コースが指定されていない or 見つからない場合はデフォルト時間を使用
         const defaultDuration = StoreDomain.getDuration(timeStr, config);
-        console.log(`[StoreDomain] Using Default Duration: ${defaultDuration}min (${StoreDomain.isLunchTime(timeStr, config) ? 'lunch' : 'dinner'})`);
+        // Ticket-09: isLunchTime(deprecated) → getApplicableSlot に変更
+        const slot = StoreDomain.getApplicableSlot(timeStr, config);
+        console.log(`[StoreDomain] Using Default Duration: ${defaultDuration}min (${slot?.label || 'unknown'})`);
         return {
             duration: defaultDuration,
             source: 'default'
@@ -474,16 +512,48 @@ export const StoreDomain = {
     },
 
     /**
-     * コースの利用条件（人数制限など）を検証する
+     * Ticket-09: メニューのserviceTypeから対応するスロットIDの配列を返す
+     * 
+     * マッピングルール:
+     *   'day'     → ['lunch', 'morning']  （昼間限定メニュー）
+     *   'night'   → ['dinner']            （夜限定メニュー）
+     *   'common'  → null                  （全時間帯で利用可能 → チェック不要）
+     *   undefined → null                  （未設定の場合も全時間帯OK）
+     * 
+     * ⚠ 運用上の注意:
+     * Baseスロット（id='base'）のみで運用する店舗の場合、
+     * 'day'/'night' のメニューは提供不可と判定される。
+     * → Baseスロットのみの店舗では、メニューの serviceType を 'common' に設定する運用が必要。
+     * 将来、Baseスロットの時刻ベース救済判定（17:00前=day OK等）を実装する場合は
+     * ここを拡張すること。
+     * 
+     * @param serviceType メニューのserviceType
+     * @returns 許可されるスロットIDの配列、またはnull（全スロットで利用可能）
+     */
+    mapServiceTypeToSlotIds: (serviceType: string | undefined | null): string[] | null => {
+        if (!serviceType || serviceType === 'common') return null;
+        if (serviceType === 'day') return ['lunch', 'morning'];
+        if (serviceType === 'night') return ['dinner'];
+        return null; // 未知のserviceTypeは許可
+    },
+
+    /**
+     * コースの利用条件（人数制限・提供時間帯）を検証する
+     * Ticket-09: serviceType による提供時間帯チェックを追加
+     * 
      * @param courseId コースID
      * @param menuItems メニュー配列
      * @param guests 人数
+     * @param timeStr 予約時間 "HH:mm"（serviceType検証に使用）
+     * @param config ResolvedStoreConfig（serviceType検証に使用）
      * @returns { valid: boolean, reason?: string }
      */
     validateCourseRequirements: (
         courseId: string | number | null,
         menuItems: any[],
-        guests: number
+        guests: number,
+        timeStr?: string,
+        config?: ResolvedStoreConfig
     ): { valid: boolean; reason?: string } => {
         if (!courseId || !menuItems) return { valid: true };
 
@@ -506,12 +576,43 @@ export const StoreDomain = {
             };
         }
 
+        // Ticket-09: serviceType による提供時間帯チェック
+        // timeStr と config が提供された場合のみ実行（後方互換のためオプショナル）
+        if (timeStr && config && course.serviceType) {
+            const allowedSlotIds = StoreDomain.mapServiceTypeToSlotIds(course.serviceType);
+            if (allowedSlotIds !== null) {
+                // serviceTypeが 'day' or 'night' → スロットIDマッチングが必要
+                const currentSlot = StoreDomain.getApplicableSlot(timeStr, config);
+                const currentSlotId = currentSlot?.id || null;
+
+                if (!currentSlotId || !allowedSlotIds.includes(currentSlotId)) {
+                    // ⚠ Baseスロット運用の店舗では、serviceType='day'/'night'のメニューは
+                    // ここで弾かれる。運用上 'common' にするか、個別スロットを設定すること。
+                    const serviceLabel = course.serviceType === 'day' ? '昼' : '夜';
+                    return {
+                        valid: false,
+                        reason: `「${course.name}」は${serviceLabel}の時間帯のみ提供可能です。`
+                    };
+                }
+            }
+        }
+
         return { valid: true };
     },
 
     /**
      * 予約時間が営業時間内に収まるか判定する
-     * ランチ・ディナーの境界チェック、閉店時間チェックを集約
+     * Ticket-07: slotsベースに変更。ランチ/ディナー固定判定を廃止
+     * 
+     * @param timeStr 開始時間 "HH:mm"
+     * @param duration 滞在時間（分）
+     * @param config ResolvedStoreConfig
+     * @returns BusinessHourValidationResult
+     */
+    /**
+     * 予約時間が営業時間内に収まるか判定する
+     * Ticket-07: slotsベースに変更。ランチ/ディナー固定判定を廃止
+     * Improved: 連続するスロットを結合して判定（モーニング→ベース等のまたぎ予約を許可）
      * 
      * @param timeStr 開始時間 "HH:mm"
      * @param duration 滞在時間（分）
@@ -526,38 +627,81 @@ export const StoreDomain = {
         const startMin = timeToMinutes(timeStr);
         // 深夜営業対応: ランチ開始より前なら翌日扱い（既存ロジック踏襲）
         let adjustedStart = startMin;
-        if (config.dinnerEndMin > 1440 && startMin < config.lunchStartMin) {
+        // 有効スロットの最小startMinを取得して深夜判定に使用
+        const enabledSlots = config.slots.filter(s => s.isEnabled);
+        const minSlotStart = enabledSlots.length > 0
+            ? Math.min(...enabledSlots.map(s => s.startMin))
+            : config.lunchStartMin; // フォールバック
+        const maxSlotEnd = enabledSlots.length > 0
+            ? Math.max(...enabledSlots.map(s => s.endMin))
+            : config.dinnerEndMin; // フォールバック
+
+        if (maxSlotEnd > 1440 && startMin < minSlotStart) {
             adjustedStart += 1440;
         }
 
-        const endMin = adjustedStart + duration;
-        // バッファ時間を含めた最終終了時刻
-        const endWithBuffer = endMin + config.cleanupDuration;
+        // まず、開始時間がどのスロットに含まれるか判定（従来通り）
+        // これは「開始可能か」の判定と、ランチLOなどの属性チェック用
+        const matchedSlot = StoreDomain.resolveSlotForTime(enabledSlots, adjustedStart);
 
-        let isLunch = false;
-        let closeMin = 0;
+        if (!matchedSlot) {
+            // 営業時間外: 有効スロットの一覧を表示
+            const slotDescriptions = enabledSlots.map(s => {
+                const startH = Math.floor(s.startMin / 60);
+                const startM = s.startMin % 60;
+                const endMinNorm = s.endMin > 1440 ? s.endMin - 1440 : s.endMin;
+                const endH = Math.floor(endMinNorm / 60);
+                const endM = endMinNorm % 60;
+                return `${s.label}: ${startH}:${startM.toString().padStart(2, '0')}~${endH}:${endM.toString().padStart(2, '0')}`;
+            }).join(', ');
 
-        // 1. 範囲判定 (Range Check)
-        if (adjustedStart >= config.lunchStartMin && adjustedStart < config.lunchEndMin) {
-            isLunch = true;
-            closeMin = config.lunchEndMin;
-        } else if (adjustedStart >= config.dinnerStartMin && adjustedStart < config.dinnerEndMin) {
-            isLunch = false;
-            closeMin = config.dinnerEndMin;
-        } else {
-            // 営業時間外
             return {
                 valid: false,
-                reason: `営業時間外です。ランチ: ${Math.floor(config.lunchStartMin / 60)}:${(config.lunchStartMin % 60).toString().padStart(2, '0')}~, ディナー: ${Math.floor(config.dinnerStartMin / 60)}:${(config.dinnerStartMin % 60).toString().padStart(2, '0')}~`,
+                reason: `営業時間外です。${slotDescriptions}`,
                 action: 'reject'
             };
         }
 
-        // 2. 終了時間チェック (Closing Time Check)
-        // 予約終了時間（+片付け）が閉店時間を超えてはいけない
+        // --- 終了時間の判定ロジック改善 ---
+        // 単一スロットの endMin ではなく、連続・重複して繋がっているスロットの「実質的な閉店時間」を探す
+        // 例: Morning(8-10) -> Base(8-22) の場合、実質閉店は22時
+
+        let effectiveCloseMin = matchedSlot.endMin;
+
+        // 探索済みスロットID（無限ループ防止）
+        const visitedSlots = new Set<string>([matchedSlot.id]);
+        let changed = true;
+
+        while (changed) {
+            changed = false;
+            // 現在の effectiveCloseMin に接する、または包含するスロットを探して拡張する
+            // 条件: スロットの開始 <= 現在の終了 (つながっている) かつ スロットの終了 > 現在の終了 (拡張できる)
+            for (const slot of enabledSlots) {
+                if (visitedSlots.has(slot.id)) continue;
+
+                // スロットが現在の有効範囲と重なっているか、接しているか
+                // Slot Start <= Current End
+                if (slot.startMin <= effectiveCloseMin) {
+                    if (slot.endMin > effectiveCloseMin) {
+                        effectiveCloseMin = slot.endMin;
+                        visitedSlots.add(slot.id);
+                        changed = true;
+                    }
+                }
+            }
+        }
+
+        const closeMin = effectiveCloseMin;
+        const endMin = adjustedStart + duration;
+        const endWithBuffer = endMin + config.cleanupDuration;
+
+        console.log(`[StoreDomain] BusinessHour Check: Start=${adjustedStart}, End=${endWithBuffer}, EffectiveClose=${closeMin} (Started in ${matchedSlot.label})`);
+
+        // 終了時間チェック: 予約終了時間（+片付け）が実質閉店時間を超えてはいけない
         if (endWithBuffer > closeMin) {
             const maxPossibleDuration = closeMin - adjustedStart - config.cleanupDuration;
-            const closeTimeStr = `${Math.floor(closeMin / 60).toString().padStart(2, '0')}:${(closeMin % 60).toString().padStart(2, '0')}`;
+            const closeMinNorm = closeMin > 1440 ? closeMin - 1440 : closeMin;
+            const closeTimeStr = `${Math.floor(closeMinNorm / 60).toString().padStart(2, '0')}:${(closeMinNorm % 60).toString().padStart(2, '0')}`;
 
             return {
                 valid: false,
@@ -571,10 +715,15 @@ export const StoreDomain = {
             };
         }
 
-        // 3. ランチのラストオーダーチェック (Lunch Last Order)
-        // ランチのみ、閉店ギリギリの入店を制限する場合がある (StoreConfig依存)
-        if (isLunch && config.lastOrderOffset > 0) {
-            const lastOrderLimit = closeMin - config.lastOrderOffset;
+        // ラストオーダーチェック（ランチスロットのみ適用、既存仕様維持）
+        // ※開始時間の属するスロットがランチの場合のみ適用
+        if (matchedSlot.id === 'lunch' && config.lastOrderOffset > 0) {
+            // ランチの場合は、ランチ固有の終わり（matchedSlot.endMin）を基準にするべきか、
+            // それとも実質終了時間を基準にするべきか？
+            // 一般的にランチLOはランチタイムの終わりに対するものなので、matchedSlot.endMinを使用
+            const lunchEnd = matchedSlot.endMin;
+            const lastOrderLimit = lunchEnd - config.lastOrderOffset;
+
             if (adjustedStart > lastOrderLimit) {
                 const limitStr = `${Math.floor(lastOrderLimit / 60)}:${(lastOrderLimit % 60).toString().padStart(2, '0')}`;
                 return {
@@ -623,13 +772,21 @@ export const StoreDomain = {
             if (resStart === -1) return false;
 
             // 深夜対応
-            if (config.dinnerEndMin > 1440 && resStart < config.lunchStartMin) {
+            const enabledSlots = config.slots.filter(s => s.isEnabled);
+            const minSlotStart = enabledSlots.length > 0
+                ? Math.min(...enabledSlots.map(s => s.startMin))
+                : config.lunchStartMin;
+            const maxSlotEnd = enabledSlots.length > 0
+                ? Math.max(...enabledSlots.map(s => s.endMin))
+                : config.dinnerEndMin;
+
+            if (maxSlotEnd > 1440 && resStart < minSlotStart) {
                 resStart += 1440;
             }
 
-            // 期間計算
-            let rIsLunch = (resStart >= config.lunchStartMin && resStart < config.lunchEndMin);
-            let rBase = rIsLunch ? config.lunchDuration : config.dinnerDuration;
+            // Ticket-07: スロットベースでduration決定
+            const rSlot = StoreDomain.resolveSlotForTime(config.slots, resStart);
+            let rBase = rSlot ? rSlot.duration : config.dinnerDuration;
 
             // 保存されたduration優先、なければデフォルト
             const storedDuration = (res as any).duration;

@@ -86,11 +86,13 @@ export default {
                     //    console.log(`[OwnerRes] Mapping ${r.name} (DocID: ${r.documentId}): Duration=${r.duration} (${typeof r.duration}) / Lane=${r.laneIndex}`);
                     // }
 
+                    // guestNameがNULLの場合、customerリレーションの名前をフォールバック
+                    const resolvedName = r.guestName || r.customer?.name || '';
                     return {
                         id: r.id, // Numeric ID
                         documentId: r.documentId, // Document ID
                         reservationNumber: r.reservationNumber,
-                        name: r.guestName, // Map guestName to 'name' for frontend compatibility
+                        name: resolvedName, // guestName → customer.name フォールバック付き
                         email: r.email,
                         phone: r.phone,
                         date: r.date,
@@ -122,6 +124,10 @@ export default {
                             documentId: r.customer.documentId, // Document ID
                             name: r.customer.name,
                             totalVisits: r.customer.totalVisits,
+                            // Ticket-CRM: Make sure internalNote is available for editing
+                            internalNote: r.customer.internalNote,
+                            allergyInfo: r.customer.allergyInfo,
+                            preferences: r.customer.preferences,
                         } : null,
                         customerStats,
                         createdAt: r.createdAt,
@@ -584,7 +590,6 @@ export default {
             if (reservation.status === 'completed' || reservation.status === 'cancelled') {
                 return ctx.badRequest(`Reservation is already ${reservation.status}`);
             }
-
             // 2. 所要時間計算 (現在時刻 - 開始時刻)
             // 日付と時間を結合してDateオブジェクトを作成
             const startDateTimeStr = `${reservation.date}T${reservation.time}`; // YYYY-MM-DDTHH:mm format

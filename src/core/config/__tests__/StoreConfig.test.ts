@@ -1,0 +1,203 @@
+import { StoreConfig, TimeSlot, ResolvedStoreConfig } from '../StoreConfig';
+
+describe('StoreConfig', () => {
+    // テスト用のヘルパー: 最小限のstoreオブジェクト
+    const createStore = (overrides: any = {}) => ({
+        lunchDuration: 60,
+        dinnerDuration: 90,
+        defaultDuration: 90,
+        lunchEndTime: '14:00',
+        businessHours: {
+            lunch: { start: '11:00', end: '14:00', isEnabled: true },
+            dinner: { start: '17:00', end: '23:00', isEnabled: true },
+            holidays: [],
+            irregularHolidays: [],
+        },
+        ...overrides,
+    });
+
+    describe('resolve()', () => {
+        test('ランチ+ディナーがある場合、slotsに2枠入ること', () => {
+            const config = StoreConfig.resolve(createStore());
+            const enabledSlots = config.slots.filter(s => s.isEnabled);
+            expect(enabledSlots).toHaveLength(2);
+            expect(enabledSlots[0].id).toBe('lunch');
+            expect(enabledSlots[1].id).toBe('dinner');
+        });
+
+        test('slotsのstartMin/endMinが正しく分換算されること', () => {
+            const config = StoreConfig.resolve(createStore());
+            const lunch = config.slots.find(s => s.id === 'lunch');
+            const dinner = config.slots.find(s => s.id === 'dinner');
+            expect(lunch?.startMin).toBe(11 * 60); // 660
+            expect(lunch?.endMin).toBe(14 * 60);   // 840
+            expect(dinner?.startMin).toBe(17 * 60); // 1020
+            expect(dinner?.endMin).toBe(23 * 60);   // 1380
+        });
+
+        test('slotsのdurationが店舗設定を反映すること', () => {
+            const config = StoreConfig.resolve(createStore({
+                lunchDuration: 45,
+                dinnerDuration: 120,
+            }));
+            const lunch = config.slots.find(s => s.id === 'lunch');
+            const dinner = config.slots.find(s => s.id === 'dinner');
+            expect(lunch?.duration).toBe(45);
+            expect(dinner?.duration).toBe(120);
+        });
+
+        test('businessHoursが空/未設定の場合、デフォルトスロットが生成されること（後方互換）', () => {
+            const config = StoreConfig.resolve({});
+            expect(config.slots.length).toBeGreaterThanOrEqual(2);
+            const lunch = config.slots.find(s => s.id === 'lunch');
+            const dinner = config.slots.find(s => s.id === 'dinner');
+            expect(lunch).toBeDefined();
+            expect(dinner).toBeDefined();
+            expect(lunch?.isEnabled).toBe(true);
+            expect(dinner?.isEnabled).toBe(true);
+        });
+
+        test('morningキーがある場合、slotsに3枠入ること', () => {
+            const config = StoreConfig.resolve(createStore({
+                businessHours: {
+                    morning: { start: '07:00', end: '10:00', isEnabled: true },
+                    lunch: { start: '11:00', end: '14:00', isEnabled: true },
+                    dinner: { start: '17:00', end: '23:00', isEnabled: true },
+                },
+            }));
+            expect(config.slots).toHaveLength(3);
+            expect(config.slots[0].id).toBe('morning');
+            expect(config.slots[0].startMin).toBe(7 * 60);
+            expect(config.slots[0].endMin).toBe(10 * 60);
+        });
+
+        test('isEnabled: false のランチ → slotsの該当枠のisEnabledがfalse', () => {
+            const config = StoreConfig.resolve(createStore({
+                businessHours: {
+                    lunch: { start: '11:00', end: '14:00', isEnabled: false },
+                    dinner: { start: '17:00', end: '23:00', isEnabled: true },
+                },
+            }));
+            const lunch = config.slots.find(s => s.id === 'lunch');
+            expect(lunch?.isEnabled).toBe(false);
+        });
+
+        test('後方互換: lunchStartMin/dinnerEndMin等のフラットフィールドも正しい値であること', () => {
+            const config = StoreConfig.resolve(createStore());
+            expect(config.lunchStartMin).toBe(11 * 60);
+            expect(config.lunchEndMin).toBe(14 * 60);
+            expect(config.dinnerStartMin).toBe(17 * 60);
+            expect(config.dinnerEndMin).toBe(23 * 60);
+            expect(config.lunchDuration).toBe(60);
+            expect(config.dinnerDuration).toBe(90);
+        });
+
+        test('morningのdurationがbh.morning.durationから取得できること', () => {
+            const config = StoreConfig.resolve(createStore({
+                businessHours: {
+                    morning: { start: '07:00', end: '10:00', isEnabled: true, duration: 30 },
+                    lunch: { start: '11:00', end: '14:00', isEnabled: true },
+                    dinner: { start: '17:00', end: '23:00', isEnabled: true },
+                },
+            }));
+            const morning = config.slots.find(s => s.id === 'morning');
+            expect(morning?.duration).toBe(30);
+        });
+
+        test('Ticket-10: baseキーがありisEnabled=trueの場合、slotsにbase枠が含まれること', () => {
+            const config = StoreConfig.resolve(createStore({
+                businessHours: {
+                    base: { start: '08:00', end: '22:00', isEnabled: true },
+                    morning: { start: '08:00', end: '10:00', isEnabled: true },
+                    lunch: { start: '11:00', end: '14:00', isEnabled: true },
+                    dinner: { start: '17:00', end: '22:00', isEnabled: true },
+                },
+            }));
+            const baseSlot = config.slots.find(s => s.id === 'base');
+            expect(baseSlot).toBeDefined();
+            expect(baseSlot?.startMin).toBe(8 * 60);  // 480
+            expect(baseSlot?.endMin).toBe(22 * 60);    // 1320
+            expect(baseSlot?.isPriority).toBe(false);   // 名前付きスロット優先のため
+            expect(baseSlot?.isEnabled).toBe(true);
+            // morning/lunch/dinnerも同時に存在すること
+            expect(config.slots.find(s => s.id === 'morning')).toBeDefined();
+            expect(config.slots.find(s => s.id === 'lunch')).toBeDefined();
+            expect(config.slots.find(s => s.id === 'dinner')).toBeDefined();
+        });
+
+        test('Ticket-10: baseキーがありisEnabled=falseの場合、slotsにbase枠が含まれないこと', () => {
+            const config = StoreConfig.resolve(createStore({
+                businessHours: {
+                    base: { start: '08:00', end: '22:00', isEnabled: false },
+                    lunch: { start: '11:00', end: '14:00', isEnabled: true },
+                    dinner: { start: '17:00', end: '23:00', isEnabled: true },
+                },
+            }));
+            const baseSlot = config.slots.find(s => s.id === 'base');
+            expect(baseSlot).toBeUndefined();
+        });
+    });
+
+    describe('resolveSlot()', () => {
+        let config: ResolvedStoreConfig;
+
+        beforeEach(() => {
+            config = StoreConfig.resolve(createStore());
+        });
+
+        test('ランチ時刻 → ランチスロットが返ること', () => {
+            const slot = StoreConfig.resolveSlot('12:00', config);
+            expect(slot?.id).toBe('lunch');
+        });
+
+        test('ディナー時刻 → ディナースロットが返ること', () => {
+            const slot = StoreConfig.resolveSlot('19:00', config);
+            expect(slot?.id).toBe('dinner');
+        });
+
+        test('どのスロットにも属さない時刻 → null', () => {
+            const slot = StoreConfig.resolveSlot('15:00', config);
+            expect(slot).toBeNull();
+        });
+
+        test('isEnabled=falseのスロットはマッチしない', () => {
+            const disabledConfig = StoreConfig.resolve(createStore({
+                businessHours: {
+                    lunch: { start: '11:00', end: '14:00', isEnabled: false },
+                    dinner: { start: '17:00', end: '23:00', isEnabled: true },
+                },
+            }));
+            const slot = StoreConfig.resolveSlot('12:00', disabledConfig);
+            expect(slot).toBeNull();
+        });
+    });
+
+    describe('isLunch()', () => {
+        test('ランチ時間帯ならtrue', () => {
+            const config = StoreConfig.resolve(createStore());
+            expect(StoreConfig.isLunch('12:00', config)).toBe(true);
+        });
+
+        test('ディナー時間帯ならfalse', () => {
+            const config = StoreConfig.resolve(createStore());
+            expect(StoreConfig.isLunch('19:00', config)).toBe(false);
+        });
+    });
+
+    describe('getStandardDuration()', () => {
+        test('ランチ時刻 → ランチdurationが返ること', () => {
+            const config = StoreConfig.resolve(createStore({ lunchDuration: 45 }));
+            expect(StoreConfig.getStandardDuration('12:00', config)).toBe(45);
+        });
+
+        test('ディナー時刻 → ディナーdurationが返ること', () => {
+            const config = StoreConfig.resolve(createStore({ dinnerDuration: 120 }));
+            expect(StoreConfig.getStandardDuration('19:00', config)).toBe(120);
+        });
+
+        test('どのスロットにも属さない時刻 → ディナーdurationにフォールバック', () => {
+            const config = StoreConfig.resolve(createStore({ dinnerDuration: 100 }));
+            expect(StoreConfig.getStandardDuration('15:30', config)).toBe(100);
+        });
+    });
+});
