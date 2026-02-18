@@ -834,6 +834,18 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
       Schema.Attribute.DefaultTo<'last_order_limit'>;
     branding: Schema.Attribute.JSON;
     businessHours: Schema.Attribute.JSON;
+    category: Schema.Attribute.Enumeration<
+      [
+        'restaurant',
+        'izakaya',
+        'cafe',
+        'salon',
+        'classroom',
+        'accommodation',
+        'other',
+      ]
+    > &
+      Schema.Attribute.DefaultTo<'restaurant'>;
     cleanUpDuration: Schema.Attribute.Integer &
       Schema.Attribute.SetMinMax<
         {

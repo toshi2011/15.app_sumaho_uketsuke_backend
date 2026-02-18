@@ -28,6 +28,19 @@
             ],
             "default": "LEAD"
         },
+        "category": {
+            "type": "enumeration",
+            "enum": [
+                "restaurant",
+                "izakaya",
+                "cafe",
+                "salon",
+                "classroom",
+                "accommodation",
+                "other"
+            ],
+            "default": "restaurant"
+        },
         "adminToken": {
             "type": "string",
             "private": true

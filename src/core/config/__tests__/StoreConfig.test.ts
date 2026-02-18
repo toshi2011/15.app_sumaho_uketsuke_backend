@@ -200,4 +200,96 @@ describe('StoreConfig', () => {
             expect(StoreConfig.getStandardDuration('15:30', config)).toBe(100);
         });
     });
+
+    describe('detectDefaults (カテゴリ対応)', () => {
+        test('category未指定 と restaurant で完全一致（後方互換）', () => {
+            const noCategory = StoreConfig.resolve(createStore({ category: undefined }));
+            const restaurant = StoreConfig.resolve(createStore({ category: 'restaurant' }));
+            // rawstore以外の全フィールドが一致すること
+            expect(noCategory.lunchDuration).toBe(restaurant.lunchDuration);
+            expect(noCategory.dinnerDuration).toBe(restaurant.dinnerDuration);
+            expect(noCategory.maxDuration).toBe(restaurant.maxDuration);
+            expect(noCategory.lunchStartMin).toBe(restaurant.lunchStartMin);
+            expect(noCategory.lunchEndMin).toBe(restaurant.lunchEndMin);
+            expect(noCategory.dinnerStartMin).toBe(restaurant.dinnerStartMin);
+            expect(noCategory.dinnerEndMin).toBe(restaurant.dinnerEndMin);
+            expect(noCategory.slots.length).toBe(restaurant.slots.length);
+            noCategory.slots.forEach((slot, i) => {
+                expect(slot.id).toBe(restaurant.slots[i].id);
+                expect(slot.label).toBe(restaurant.slots[i].label);
+                expect(slot.startMin).toBe(restaurant.slots[i].startMin);
+                expect(slot.endMin).toBe(restaurant.slots[i].endMin);
+                expect(slot.duration).toBe(restaurant.slots[i].duration);
+            });
+        });
+
+        test('category=cafe でDB値未設定 → カフェ用デフォルト適用', () => {
+            const config = StoreConfig.resolve({
+                category: 'cafe',
+                businessHours: {},
+            });
+            expect(config.lunchDuration).toBe(60);   // cafe default
+            expect(config.dinnerDuration).toBe(60);   // cafe default
+            expect(config.maxDuration).toBe(120);     // cafe default
+        });
+
+        test('category=cafe でもDB値がある場合はDB値が優先', () => {
+            const config = StoreConfig.resolve({
+                category: 'cafe',
+                lunchDuration: 45,
+                dinnerDuration: 90,
+                businessHours: {},
+            });
+            expect(config.lunchDuration).toBe(45);   // DB値
+            expect(config.dinnerDuration).toBe(90);   // DB値
+        });
+
+        test('category=salon → スロットラベルがサロン用', () => {
+            const config = StoreConfig.resolve({
+                category: 'salon',
+                businessHours: {},
+            });
+            const lunch = config.slots.find(s => s.id === 'lunch');
+            const dinner = config.slots.find(s => s.id === 'dinner');
+            expect(lunch?.label).toBe('午前');
+            expect(dinner?.label).toBe('午後');
+        });
+
+        test('category=izakaya → デフォルトのディナー終了時間が23:30', () => {
+            const config = StoreConfig.resolve({
+                category: 'izakaya',
+                businessHours: {},
+            });
+            const dinner = config.slots.find(s => s.id === 'dinner');
+            expect(dinner?.startMin).toBe(17 * 60);      // 1020
+            expect(dinner?.endMin).toBe(23 * 60 + 30);    // 1410
+        });
+
+        test('category=classroom → スロットラベルがクラス用', () => {
+            const config = StoreConfig.resolve({
+                category: 'classroom',
+                businessHours: {},
+            });
+            const lunch = config.slots.find(s => s.id === 'lunch');
+            const dinner = config.slots.find(s => s.id === 'dinner');
+            expect(lunch?.label).toBe('午前クラス');
+            expect(dinner?.label).toBe('午後クラス');
+        });
+
+        test('既存のrestaurant createStoreの出力が変わらないこと（完全後方互換）', () => {
+            // 既存テストと同じcreateStoreを使用し、category指定なし
+            const config = StoreConfig.resolve(createStore());
+            // 既存テストのアサーションと同じ期待値
+            expect(config.lunchStartMin).toBe(11 * 60);
+            expect(config.lunchEndMin).toBe(14 * 60);
+            expect(config.dinnerStartMin).toBe(17 * 60);
+            expect(config.dinnerEndMin).toBe(23 * 60);
+            expect(config.lunchDuration).toBe(60);
+            expect(config.dinnerDuration).toBe(90);
+            const lunch = config.slots.find(s => s.id === 'lunch');
+            const dinner = config.slots.find(s => s.id === 'dinner');
+            expect(lunch?.label).toBe('ランチ');
+            expect(dinner?.label).toBe('ディナー');
+        });
+    });
 });

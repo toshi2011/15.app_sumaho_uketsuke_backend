@@ -54,7 +54,12 @@ export interface TimeSlot {
     isEnabled: boolean;
 }
 
-/** TimeSlot のラベルマッピング */
+/** 店舗カテゴリ型定義 */
+export type StoreCategory =
+    | 'restaurant' | 'izakaya' | 'cafe'
+    | 'salon' | 'classroom' | 'accommodation' | 'other';
+
+/** TimeSlot のラベルマッピング（restaurant デフォルト） */
 const SLOT_LABELS: Record<string, string> = {
     base: '通し営業',
     morning: 'モーニング',
@@ -145,6 +150,102 @@ const DEFAULTS = {
     }
 };
 
+/**
+ * カテゴリ別デフォルト値を返す内部ヘルパー
+ * restaurant / undefined は既存 DEFAULTS と完全一致（後方互換保証）
+ */
+function detectDefaults(category: StoreCategory | undefined | null): typeof DEFAULTS {
+    switch (category) {
+        case 'izakaya':
+            return {
+                ...DEFAULTS,
+                LUNCH_START: "11:30",
+                LUNCH_END: "14:00",
+                DINNER_START: "17:00",
+                DINNER_END: "23:30",
+                LUNCH_DURATION: 60,
+                DINNER_DURATION: 90,
+                MAX_DURATION: 180,
+            };
+        case 'cafe':
+            return {
+                ...DEFAULTS,
+                MORNING_START: "08:00",
+                MORNING_END: "11:00",
+                LUNCH_START: "11:00",
+                LUNCH_END: "17:00",
+                DINNER_START: "17:00",
+                DINNER_END: "21:00",
+                MORNING_DURATION: 45,
+                LUNCH_DURATION: 60,
+                DINNER_DURATION: 60,
+                MAX_DURATION: 120,
+            };
+        case 'salon':
+            return {
+                ...DEFAULTS,
+                MORNING_START: "09:00",
+                MORNING_END: "12:00",
+                LUNCH_START: "09:00",
+                LUNCH_END: "13:00",
+                DINNER_START: "13:00",
+                DINNER_END: "20:00",
+                MORNING_DURATION: 60,
+                LUNCH_DURATION: 60,
+                DINNER_DURATION: 60,
+                MAX_DURATION: 180,
+            };
+        case 'classroom':
+            return {
+                ...DEFAULTS,
+                LUNCH_START: "10:00",
+                LUNCH_END: "13:00",
+                DINNER_START: "14:00",
+                DINNER_END: "18:00",
+                LUNCH_DURATION: 90,
+                DINNER_DURATION: 90,
+                MAX_DURATION: 180,
+            };
+        case 'accommodation':
+            return {
+                ...DEFAULTS,
+                LUNCH_START: "15:00",
+                LUNCH_END: "18:00",
+                DINNER_START: "18:00",
+                DINNER_END: "22:00",
+                LUNCH_DURATION: 180,
+                DINNER_DURATION: 120,
+                MAX_DURATION: 1440,
+            };
+        case 'restaurant':
+        case 'other':
+        default:
+            return { ...DEFAULTS };
+    }
+}
+
+/**
+ * カテゴリ別スロットラベルを返す内部ヘルパー
+ * restaurant / undefined は既存 SLOT_LABELS と完全一致
+ */
+function getSlotLabels(category: StoreCategory | undefined | null): Record<string, string> {
+    switch (category) {
+        case 'salon':
+            return { base: '営業時間', morning: '午前', lunch: '午前', dinner: '午後' };
+        case 'classroom':
+            return { base: '開講時間', morning: '午前クラス', lunch: '午前クラス', dinner: '午後クラス' };
+        case 'accommodation':
+            return { base: '受付時間', morning: '朝食', lunch: 'チェックイン', dinner: 'ディナー' };
+        case 'cafe':
+            return { base: '通し営業', morning: 'モーニング', lunch: 'ランチ', dinner: 'ティータイム' };
+        case 'izakaya':
+        case 'restaurant':
+        case 'other':
+        default:
+            return { ...SLOT_LABELS };
+    }
+}
+
 export const StoreConfig = {
     /**
      * 店舗設定を解決する関数
@@ -154,6 +255,9 @@ export const StoreConfig = {
     resolve: (store: any): ResolvedStoreConfig => {
         // 1. Strapi 5 Data Normalization (attributesフラット化)
         const safeStore = store ? (store.attributes || store) : {};
+        const category: StoreCategory = safeStore.category || 'restaurant';
+        const D = detectDefaults(category);
+        const labels = getSlotLabels(category);
         const bh = safeStore.businessHours || {};
 
         // Helper: Robust Number Conversion with Fallback
@@ -175,14 +279,14 @@ export const StoreConfig = {
             return timeToMinutes(val || defaultVal);
         };
 
-        const lunchStartStr = bh.lunch?.start || DEFAULTS.LUNCH_START;
-        const lunchEndStr = bh.lunch?.end || safeStore.lunchEndTime || DEFAULTS.LUNCH_END;
-        const dinnerStartStr = bh.dinner?.start || DEFAULTS.DINNER_START;
-        const dinnerEndStr = bh.dinner?.end || DEFAULTS.DINNER_END;
+        const lunchStartStr = bh.lunch?.start || D.LUNCH_START;
+        const lunchEndStr = bh.lunch?.end || safeStore.lunchEndTime || D.LUNCH_END;
+        const dinnerStartStr = bh.dinner?.start || D.DINNER_START;
+        const dinnerEndStr = bh.dinner?.end || D.DINNER_END;
 
         // 深夜営業 (日またぎ) の判定ロジック
-        let dinnerEndMin = resolveTime(dinnerEndStr, DEFAULTS.DINNER_END);
-        const dinnerStartMin = resolveTime(dinnerStartStr, DEFAULTS.DINNER_START);
+        let dinnerEndMin = resolveTime(dinnerEndStr, D.DINNER_END);
+        const dinnerStartMin = resolveTime(dinnerStartStr, D.DINNER_START);
 
         // Late Night Logic Validation
         // 数値変換後、もし「終了時間 < 開始時間」かつ「終了時間が昼過ぎではない(例:朝4時まで)」場合は翌日扱い
@@ -192,24 +296,24 @@ export const StoreConfig = {
         }
 
         // Resolve Durations with Source Tracking
-        const lunchDuration = resolveNum(safeStore.lunchDuration, DEFAULTS.LUNCH_DURATION);
-        const dinnerDuration = resolveNum(safeStore.dinnerDuration, DEFAULTS.DINNER_DURATION);
-        const maxDuration = resolveNum(safeStore.maxDurationLimit, DEFAULTS.MAX_DURATION);
+        const lunchDuration = resolveNum(safeStore.lunchDuration, D.LUNCH_DURATION);
+        const dinnerDuration = resolveNum(safeStore.dinnerDuration, D.DINNER_DURATION);
+        const maxDuration = resolveNum(safeStore.maxDurationLimit, D.MAX_DURATION);
 
         // Resolve Loose Match Settings (緩和マッチ設定)
         // 店舗DBに設定があればそれを使用、なければデフォルト値
         const looseMatchMinEfficiency = resolveNum(
             safeStore.looseMatchMinEfficiency,
-            DEFAULTS.LOOSE_MATCH_MIN_EFFICIENCY
+            D.LOOSE_MATCH_MIN_EFFICIENCY
         );
         const looseMatchMaxWastedSeats = resolveNum(
             safeStore.looseMatchMaxWastedSeats,
-            DEFAULTS.LOOSE_MATCH_MAX_WASTED_SEATS
+            D.LOOSE_MATCH_MAX_WASTED_SEATS
         );
 
         // === Ticket-07: TimeSlot 配列の生成 ===
-        const lunchStartMinVal = resolveTime(lunchStartStr, DEFAULTS.LUNCH_START);
-        const lunchEndMinVal = resolveTime(lunchEndStr, DEFAULTS.LUNCH_END);
+        const lunchStartMinVal = resolveTime(lunchStartStr, D.LUNCH_START);
+        const lunchEndMinVal = resolveTime(lunchEndStr, D.LUNCH_END);
 
         const slots: TimeSlot[] = [];
 
@@ -220,11 +324,11 @@ export const StoreConfig = {
             const baseEndStr = bh.base.end || '22:00';
             const baseDuration = resolveNum(
                 safeStore.baseDuration || bh.base.duration,
-                DEFAULTS.LUNCH_DURATION  // 通し営業のデフォルトはランチ相当
+                D.LUNCH_DURATION  // 通し営業のデフォルトはランチ相当
             );
             slots.push({
                 id: 'base',
-                label: SLOT_LABELS['base'] || '通し営業',
+                label: labels['base'] || '通し営業',
                 startMin: resolveTime(baseStartStr, '08:00'),
                 endMin: resolveTime(baseEndStr, '22:00'),
                 duration: baseDuration.value,
@@ -235,17 +339,17 @@ export const StoreConfig = {
 
         // モーニング（businessHoursに morning キーがある場合のみ生成）
         if (bh.morning) {
-            const morningStartStr = bh.morning.start || DEFAULTS.MORNING_START;
-            const morningEndStr = bh.morning.end || DEFAULTS.MORNING_END;
+            const morningStartStr = bh.morning.start || D.MORNING_START;
+            const morningEndStr = bh.morning.end || D.MORNING_END;
             const morningDuration = resolveNum(
                 safeStore.morningDuration || bh.morning.duration,
-                DEFAULTS.MORNING_DURATION
+                D.MORNING_DURATION
             );
             slots.push({
                 id: 'morning',
-                label: SLOT_LABELS['morning'] || 'モーニング',
-                startMin: resolveTime(morningStartStr, DEFAULTS.MORNING_START),
-                endMin: resolveTime(morningEndStr, DEFAULTS.MORNING_END),
+                label: labels['morning'] || 'モーニング',
+                startMin: resolveTime(morningStartStr, D.MORNING_START),
+                endMin: resolveTime(morningEndStr, D.MORNING_END),
                 duration: morningDuration.value,
                 isPriority: true,
                 isEnabled: bh.morning.isEnabled !== false,
@@ -256,7 +360,7 @@ export const StoreConfig = {
         const lunchIsEnabled = bh.lunch ? bh.lunch.isEnabled !== false : true;
         slots.push({
             id: 'lunch',
-            label: SLOT_LABELS['lunch'] || 'ランチ',
+            label: labels['lunch'] || 'ランチ',
             startMin: lunchStartMinVal,
             endMin: lunchEndMinVal,
             duration: lunchDuration.value,
@@ -268,7 +372,7 @@ export const StoreConfig = {
         const dinnerIsEnabled = bh.dinner ? bh.dinner.isEnabled !== false : true;
         slots.push({
             id: 'dinner',
-            label: SLOT_LABELS['dinner'] || 'ディナー',
+            label: labels['dinner'] || 'ディナー',
             startMin: dinnerStartMin,
             endMin: dinnerEndMin,
             duration: dinnerDuration.value,
@@ -283,7 +387,7 @@ export const StoreConfig = {
             // 後方互換フィールド（@deprecated）
             lunchDuration: lunchDuration.value,
             dinnerDuration: dinnerDuration.value,
-            cleanupDuration: DEFAULTS.CLEANUP, // 固定
+            cleanupDuration: D.CLEANUP, // 固定
             maxDuration: maxDuration.value,
 
             lunchStartMin: lunchStartMinVal,
@@ -291,7 +395,7 @@ export const StoreConfig = {
             dinnerStartMin: dinnerStartMin,
             dinnerEndMin: dinnerEndMin,
 
-            lastOrderOffset: DEFAULTS.LAST_ORDER_OFFSET,
+            lastOrderOffset: D.LAST_ORDER_OFFSET,
             bookingAcceptanceMode: safeStore.bookingAcceptanceMode || 'manual',
             rejectionStrategy: safeStore.rejectionStrategy || 'auto_reject',
 

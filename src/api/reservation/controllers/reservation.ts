@@ -86,14 +86,11 @@ export default factories.createCoreController('api::reservation.reservation', ({
                     data.customer = linkedCustomerId;
                 }
                 if (data && data.store && data.date && data.time && data.guests) {
-<<<<<<< HEAD
-=======
                     // Fix: Map 'name' from frontend to 'guestName' in schema
                     if (data.name && !data.guestName) {
                         data.guestName = data.name;
                     }
 
->>>>>>> feature/timeslot-refactor
                     // Skip check logic if requested (e.g. Owner Override)
                     if (!data.skipAvailabilityCheck && (!data.assignedTables || data.assignedTables.length === 0)) {
                         const storeService = strapi.service('api::store.store');
