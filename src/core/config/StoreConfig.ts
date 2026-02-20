@@ -246,6 +246,43 @@ function getSlotLabels(category: StoreCategory | undefined | null): Record<strin
     }
 }
 
+/**
+ * カテゴリに基づいた初期プリセットをStrapi互換のペイロード形式で返す
+ * 店舗作成API（POST /api/stores）で使用。detectDefaults()の出力をDBスキーマにマッピング。
+ * @param category 店舗カテゴリ
+ * @returns Strapiスキーマに準拠した初期設定オブジェクト
+ */
+export function buildCategoryPreset(category: StoreCategory | undefined | null): Record<string, any> {
+    const D = detectDefaults(category);
+    const cat = category || 'restaurant';
+
+    // カテゴリ別の営業スロット有効フラグ
+    const slotFlags: Record<string, { base: boolean; morning: boolean; lunch: boolean; dinner: boolean }> = {
+        restaurant: { base: false, morning: false, lunch: true, dinner: true },
+        izakaya: { base: false, morning: false, lunch: true, dinner: true },
+        cafe: { base: true, morning: true, lunch: true, dinner: true },
+        salon: { base: true, morning: false, lunch: true, dinner: true },
+        classroom: { base: false, morning: false, lunch: true, dinner: true },
+        accommodation: { base: false, morning: false, lunch: true, dinner: true },
+        other: { base: false, morning: false, lunch: true, dinner: true },
+    };
+    const flags = slotFlags[cat] || slotFlags.restaurant;
+
+    return {
+        category: cat,
+        businessHours: {
+            base: { start: D.MORNING_START, end: D.DINNER_END, isEnabled: flags.base },
+            morning: { start: D.MORNING_START, end: D.MORNING_END, isEnabled: flags.morning },
+            lunch: { start: D.LUNCH_START, end: D.LUNCH_END, isEnabled: flags.lunch },
+            dinner: { start: D.DINNER_START, end: D.DINNER_END, isEnabled: flags.dinner },
+        },
+        morningDuration: D.MORNING_DURATION,
+        lunchDuration: D.LUNCH_DURATION,
+        dinnerDuration: D.DINNER_DURATION,
+        maxDurationLimit: D.MAX_DURATION,
+    };
+}
+
 export const StoreConfig = {
     /**
      * 店舗設定を解決する関数

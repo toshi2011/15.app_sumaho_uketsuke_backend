@@ -1,8 +1,44 @@
 import { factories } from '@strapi/strapi';
-import { StoreConfig } from '../../../core/config/StoreConfig';
+import { StoreConfig, buildCategoryPreset } from '../../../core/config/StoreConfig';
 import { StoreDomain, AvailableSlot } from '../../../core/domain/StoreDomain';
 
 export default factories.createCoreController('api::store.store', ({ strapi }) => ({
+    /**
+     * POST /api/stores
+     * 店舗作成時にカテゴリに応じたプリセット（営業時間・所要時間等）を注入する
+     */
+    async create(ctx) {
+        const body = ctx.request.body;
+        const data = body?.data || body;
+        const category = data?.category || 'restaurant';
+
+        // StoreConfig からカテゴリ別プリセットを取得
+        const preset = buildCategoryPreset(category);
+
+        // プリセットをベースに、リクエスト内の明示的な値を優先マージ
+        const mergedData = {
+            ...preset,
+            ...data,
+            // businessHours は深いマージが必要
+            businessHours: {
+                ...preset.businessHours,
+                ...(data.businessHours || {}),
+            },
+        };
+
+        // Strapi v5 の body 形式に戻す
+        if (body?.data) {
+            ctx.request.body.data = mergedData;
+        } else {
+            ctx.request.body = mergedData;
+        }
+
+        strapi.log.info(`[StoreController] 店舗作成: category=${category} プリセット注入完了`);
+
+        // 親の create を呼び出し（Strapi 標準の保存処理）
+        return await super.create(ctx);
+    },
+
     async findOne(ctx) {
         const { data, meta } = await super.findOne(ctx);
         if (data) {

@@ -1,4 +1,4 @@
-import { StoreConfig, TimeSlot, ResolvedStoreConfig } from '../StoreConfig';
+import { StoreConfig, TimeSlot, ResolvedStoreConfig, buildCategoryPreset } from '../StoreConfig';
 
 describe('StoreConfig', () => {
     // テスト用のヘルパー: 最小限のstoreオブジェクト
@@ -290,6 +290,55 @@ describe('StoreConfig', () => {
             const dinner = config.slots.find(s => s.id === 'dinner');
             expect(lunch?.label).toBe('ランチ');
             expect(dinner?.label).toBe('ディナー');
+        });
+    });
+
+    describe('buildCategoryPreset (店舗作成時プリセット注入)', () => {
+        it('restaurant → ランチ・ディナー有効、モーニング・base無効', () => {
+            const preset = buildCategoryPreset('restaurant');
+            expect(preset.category).toBe('restaurant');
+            expect(preset.businessHours.lunch.isEnabled).toBe(true);
+            expect(preset.businessHours.dinner.isEnabled).toBe(true);
+            expect(preset.businessHours.morning.isEnabled).toBe(false);
+            expect(preset.businessHours.base.isEnabled).toBe(false);
+        });
+
+        it('cafe → 全スロット有効、MAX_DURATION=120', () => {
+            const preset = buildCategoryPreset('cafe');
+            expect(preset.category).toBe('cafe');
+            expect(preset.businessHours.base.isEnabled).toBe(true);
+            expect(preset.businessHours.morning.isEnabled).toBe(true);
+            expect(preset.businessHours.lunch.isEnabled).toBe(true);
+            expect(preset.businessHours.dinner.isEnabled).toBe(true);
+            expect(preset.maxDurationLimit).toBe(120);
+        });
+
+        it('izakaya → ディナー終了23:30、ディナー所要時間90分', () => {
+            const preset = buildCategoryPreset('izakaya');
+            expect(preset.businessHours.dinner.end).toBe('23:30');
+            expect(preset.dinnerDuration).toBe(90);
+        });
+
+        it('salon → base有効、ランチ開始09:00', () => {
+            const preset = buildCategoryPreset('salon');
+            expect(preset.businessHours.base.isEnabled).toBe(true);
+            expect(preset.businessHours.lunch.start).toBe('09:00');
+        });
+
+        it('undefined → restaurant と同じ結果', () => {
+            const presetUndef = buildCategoryPreset(undefined);
+            const presetRest = buildCategoryPreset('restaurant');
+            expect(presetUndef).toEqual(presetRest);
+        });
+
+        it('プリセットをresolveに通しても正常動作（往復テスト）', () => {
+            const preset = buildCategoryPreset('cafe');
+            const config = StoreConfig.resolve(preset);
+            expect(config.lunchDuration).toBe(60);
+            expect(config.dinnerDuration).toBe(60);
+            expect(config.maxDuration).toBe(120);
+            const lunch = config.slots.find(s => s.id === 'lunch');
+            expect(lunch?.isEnabled).toBe(true);
         });
     });
 });
