@@ -39,6 +39,49 @@ export default factories.createCoreController('api::store.store', ({ strapi }) =
         return await super.create(ctx);
     },
 
+    /**
+     * POST /api/stores/super-admin/bulk-create
+     * スーパー管理者による一括店舗作成用（Strapiポリシーガードをバイパス）
+     */
+    async superAdminCreate(ctx) {
+        const adminKey = ctx.request.headers['x-super-admin-key'];
+        const validKey = process.env.SUPER_ADMIN_KEY;
+
+        if (!validKey || adminKey !== validKey) {
+            return ctx.forbidden('Invalid Super Admin Key');
+        }
+
+        const body = ctx.request.body;
+        const data = body?.data || body;
+        const category = data?.category || 'restaurant';
+
+        const preset = buildCategoryPreset(category);
+
+        const mergedData = {
+            ...preset,
+            ...data,
+            businessHours: {
+                ...preset.businessHours,
+                ...(data.businessHours || {}),
+            },
+            // 自動的に公開状態 (Published) にする
+            publishedAt: new Date(),
+        };
+
+        try {
+            const createdStore = await strapi.entityService.create('api::store.store', {
+                data: mergedData,
+            });
+
+            strapi.log.info(`[StoreController] スーパー管理者店舗作成: category=${category} documentId=${createdStore.documentId}`);
+
+            return { data: createdStore };
+        } catch (error) {
+            strapi.log.error(`[StoreController] スーパー管理者店舗作成エラー: ${error.message}`);
+            return ctx.internalServerError('Failed to create store', { error });
+        }
+    },
+
     async findOne(ctx) {
         const { data, meta } = await super.findOne(ctx);
         if (data) {

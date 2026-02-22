@@ -20,6 +20,16 @@ export default {
                 middlewares: [],
             },
         },
+        {
+            method: 'POST',
+            path: '/stores/super-admin/bulk-create',
+            handler: 'store.superAdminCreate',
+            config: {
+                auth: false,
+                policies: [],
+                middlewares: [],
+            },
+        },
     ],
 };
 

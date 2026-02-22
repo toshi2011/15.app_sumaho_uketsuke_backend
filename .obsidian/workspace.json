@@ -4,21 +4,21 @@
     "type": "split",
     "children": [
       {
-        "id": "39638ab5bc91999e",
+        "id": "f7c90b5d9a15edb8",
         "type": "tabs",
         "children": [
           {
-            "id": "66f909598dd797d7",
+            "id": "d121fd839f11796c",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "note/Dialy/2026-02-17.md",
+                "file": "note/Dialy/2026-02-20.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "2026-02-17"
+              "title": "2026-02-20"
             }
           }
         ]
@@ -177,23 +177,38 @@
       "daily-notes:今日のデイリーノートを開く": false,
       "templates:テンプレートを挿入": false,
       "command-palette:コマンドパレットを開く": false,
-      "bases:Create new base": false
+      "bases:Create new base": false,
+      "markdown-importer:Markdownインポーターを開く": false
     }
   },
-  "active": "66f909598dd797d7",
+  "active": "d121fd839f11796c",
   "lastOpenFiles": [
-    "tsconfig.test.json",
-    "src/core/domain/__tests__/StoreDomain.test.ts",
-    "src/core/domain/__tests__",
-    "src/core/config/__tests__/StoreConfig.test.ts",
-    "src/core/config/__tests__",
-    "src/api/owner-customer/routes/owner-customer.ts",
-    "src/api/owner-customer/controllers/owner-customer.ts",
-    "src/api/owner-customer/routes",
-    "src/api/owner-customer/controllers",
-    "src/api/owner-customer",
-    "jest.config.js",
-    "note/Dialy/2025-12-07.md",
-    "note/2026-02-17.md"
+    "note/pg_marge_front.txt",
+    "note/pg_marge_back.txt",
+    "note/Dialy/2026-02-17.md",
+    "note/Dialy/2026-02-20.md",
+    "note/Templates/Daily.md",
+    "note/note/Welcome.md",
+    "note/00_Inbox/無題のファイル無題のファイル.md",
+    "note/Dialy/2026-02-01.md",
+    "note/Pasted image 20251212151007.png",
+    "note/2025-12-12.md",
+    "note/2025-12-11.md",
+    "note/2025-12-10.md",
+    "note/2025-12-06.md",
+    "note/2026-02-15.md",
+    "note/2026-02-17.md",
+    "note/開発Doc/起動：入口案内.md",
+    "2026-02-22.md",
+    "dist/src/api/owner-session/content-types/owner-session/schema.json",
+    "dist/src/api/owner-session/content-types/owner-session",
+    "dist/src/api/owner-session/content-types",
+    "dist/src/api/customer/content-types/customer/schema.json",
+    "dist/src/api/customer/content-types/customer",
+    "dist/src/api/customer/content-types",
+    "dist/src/api/table/content-types/table/schema.json",
+    "dist/src/api/table/content-types/table/lifecycles.js",
+    "dist/src/api/table/services/table.js",
+    "note/Dialy/2025-12-07.md"
   ]
 }
