@@ -59,6 +59,31 @@ export type StoreCategory =
     | 'restaurant' | 'izakaya' | 'cafe'
     | 'salon' | 'classroom' | 'accommodation' | 'other';
 
+/**
+ * 特定日の営業時間オーバーライド設定
+ * customDailyHours JSON の各日付エントリに対応
+ */
+export interface CustomDailySlotOverride {
+    /** スロットID（'lunch', 'dinner' 等） */
+    id: string;
+    /** 有効フラグ */
+    isEnabled: boolean;
+    /** 開始時間 "HH:mm" */
+    start?: string;
+    /** 終了時間 "HH:mm" */
+    end?: string;
+}
+
+export interface CustomDailyHourEntry {
+    /** true の場合、この日は臨時休業 */
+    isClosed: boolean;
+    /** 営業時間のオーバーライド（isClosed=false の場合のみ有効） */
+    slots?: CustomDailySlotOverride[];
+}
+
+/** customDailyHours JSON の型定義（キーは "YYYY-MM-DD" 形式） */
+export type CustomDailyHours = Record<string, CustomDailyHourEntry>;
+
 /** TimeSlot のラベルマッピング（restaurant デフォルト） */
 const SLOT_LABELS: Record<string, string> = {
     base: '通し営業',
@@ -288,8 +313,10 @@ export const StoreConfig = {
      * 店舗設定を解決する関数
      * DBの値とシステムデフォルト値をマージして、有効な設定オブジェクトを返します。
      * Ticket 01: Strapi 5対応、型変換の徹底、取得元の追跡を追加
+     * @param store 店舗エンティティ（Strapi rawデータ）
+     * @param date オプション。対象日付 "YYYY-MM-DD"。指定時、customDailyHours による上書きを適用
      */
-    resolve: (store: any): ResolvedStoreConfig => {
+    resolve: (store: any, date?: string): ResolvedStoreConfig => {
         // 1. Strapi 5 Data Normalization (attributesフラット化)
         const safeStore = store ? (store.attributes || store) : {};
         const category: StoreCategory = safeStore.category || 'restaurant';
@@ -417,9 +444,36 @@ export const StoreConfig = {
             isEnabled: dinnerIsEnabled,
         });
 
+        // === 特定日オーバーライド (customDailyHours) ===
+        // date が指定されており、customDailyHours にその日のエントリがある場合、
+        // スロットの有効/無効や時間帯を上書きする
+        let finalSlots = slots;
+        const customDailyHours: CustomDailyHours | undefined = safeStore.customDailyHours;
+        if (date && customDailyHours && customDailyHours[date]) {
+            const override = customDailyHours[date];
+
+            if (override.isClosed) {
+                // 臨時休業: 全スロットを無効化
+                finalSlots = slots.map(s => ({ ...s, isEnabled: false }));
+            } else if (override.slots && override.slots.length > 0) {
+                // 特定スロットの上書き
+                finalSlots = slots.map(s => {
+                    const overrideSlot = override.slots!.find(os => os.id === s.id);
+                    if (!overrideSlot) return s;
+
+                    return {
+                        ...s,
+                        isEnabled: overrideSlot.isEnabled,
+                        startMin: overrideSlot.start ? resolveTime(overrideSlot.start, '') : s.startMin,
+                        endMin: overrideSlot.end ? resolveTime(overrideSlot.end, '') : s.endMin,
+                    };
+                });
+            }
+        }
+
         return {
             // Ticket-07: TimeSlot 配列（推奨）
-            slots,
+            slots: finalSlots,
 
             // 後方互換フィールド（@deprecated）
             lunchDuration: lunchDuration.value,

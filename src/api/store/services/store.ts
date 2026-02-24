@@ -33,7 +33,7 @@ export default factories.createCoreService('api::store.store', ({ strapi }) => (
                 return { available: false, capacityUsed: 0, requiredDuration: 0, reason: 'Store not found', action: 'reject' };
             }
 
-            const config = StoreConfig.resolve(store);
+            const config = StoreConfig.resolve(store, date);
             const menuItems = (store as any).menuItems || [];
 
             // === コース要件の検証 (minGuests等) ===

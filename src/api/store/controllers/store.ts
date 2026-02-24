@@ -155,9 +155,10 @@ export default factories.createCoreController('api::store.store', ({ strapi }) =
                 return ctx.notFound('Store not found');
             }
 
-            const config = StoreConfig.resolve(store);
+            const config = StoreConfig.resolve(store, date as string);
 
             // スロット生成（バックエンドで集約）
+            // 注: config.slots は customDailyHours による上書き適用済み
             const timeSlots = StoreDomain.generateTimeSlots(config, date as string, store);
 
             // 休業日の場合は空配列を返す

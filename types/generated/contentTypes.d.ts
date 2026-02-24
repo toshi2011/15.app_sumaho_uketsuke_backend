@@ -857,6 +857,7 @@ export interface ApiStoreStore extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    customDailyHours: Schema.Attribute.JSON;
     customers: Schema.Attribute.Relation<'oneToMany', 'api::customer.customer'>;
     defaultDuration: Schema.Attribute.Integer &
       Schema.Attribute.SetMinMax<

@@ -376,21 +376,33 @@ export const StoreDomain = {
      */
     generateTimeSlots: (config: ResolvedStoreConfig, date: string, store: any): string[] => {
         const businessHours = store?.businessHours;
+        const safeStore = store ? (store.attributes || store) : {};
+        const customDailyHours = safeStore.customDailyHours;
 
-        // 1. 定休日チェック
-        if (businessHours) {
-            const d = new Date(date);
-            const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
-
-            const holidays = businessHours.holidays || [];
-            if (holidays.includes(dayOfWeek)) {
-                return []; // 定休日
-            }
-
-            // 2. 臨時休業チェック
-            const irregularHolidays = businessHours.irregularHolidays || [];
-            if (irregularHolidays.includes(date)) {
+        // 0. customDailyHours による臨時休業チェック（最優先）
+        if (customDailyHours && customDailyHours[date]) {
+            if (customDailyHours[date].isClosed) {
                 return []; // 臨時休業
+            }
+            // customDailyHours にエントリがある場合、
+            // 定休日・irregularHolidays チェックはスキップ
+            // （店主が明示的にこの日の設定を行っているため）
+        } else {
+            // 1. 定休日チェック（customDailyHoursで上書きされていない場合のみ）
+            if (businessHours) {
+                const d = new Date(date);
+                const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+
+                const holidays = businessHours.holidays || [];
+                if (holidays.includes(dayOfWeek)) {
+                    return []; // 定休日
+                }
+
+                // 2. 臨時休業チェック（後方互換: irregularHolidays）
+                const irregularHolidays = businessHours.irregularHolidays || [];
+                if (irregularHolidays.includes(date)) {
+                    return []; // 臨時休業
+                }
             }
         }
 
@@ -410,10 +422,19 @@ export const StoreDomain = {
         };
 
         // config.slots から有効なスロットの時間を生成
+        // 注: customDailyHours が適用された config では、
+        //     特定スロットの isEnabled が変更されている場合がある
         const enabledSlots = config.slots.filter(s => s.isEnabled);
 
         if (enabledSlots.length === 0) {
-            // フォールバック: 有効スロットがない場合はデフォルト営業時間
+            // customDailyHours で全スロットが無効化された場合は空配列を返す
+            // （臨時休業の場合はここには到達しない — 上で早期リターンしているため）
+            // フォールバック: customDailyHours が設定されていない場合のみデフォルト営業時間を生成
+            const hasOverride = customDailyHours && customDailyHours[date];
+            if (hasOverride) {
+                return []; // オーバーライドで全スロット無効 → 営業なし
+            }
+            // 店舗にスロット設定がない場合のデフォルト
             for (let h = 11; h <= 20; h++) {
                 for (let m = 0; m < 60; m += 15) {
                     if (h === 20 && m > 0) break;

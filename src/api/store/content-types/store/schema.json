@@ -60,6 +60,9 @@
         "businessHours": {
             "type": "json"
         },
+        "customDailyHours": {
+            "type": "json"
+        },
         "assignmentPriorities": {
             "type": "json"
         },
