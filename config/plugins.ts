@@ -1,3 +1,5 @@
+const isDev = process.env.NODE_ENV === 'development';
+
 export default {
     upload: {
         config: {
@@ -6,9 +8,10 @@ export default {
                     maxage: 300000
                 },
             },
-            sizeOptimization: false,
-            responsiveDimensions: false,
+            sizeOptimization: !isDev,
+            responsiveDimensions: !isDev,
             autoOrientation: false,
+            ...(isDev ? { breakpoints: {} } : {}),
         },
     },
 };
