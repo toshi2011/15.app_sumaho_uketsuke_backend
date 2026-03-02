@@ -13,28 +13,15 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "note/Dialy/2026-02-28.md",
+                "file": "note/開発Doc/★★★起動：入口案内.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "2026-02-28"
-            }
-          },
-          {
-            "id": "2c75e17cb94961dd",
-            "type": "leaf",
-            "state": {
-              "type": "release-notes",
-              "state": {
-                "currentVersion": "1.12.4"
-              },
-              "icon": "lucide-book-up",
-              "title": "リリースノート 1.12.4"
+              "title": "★★★起動：入口案内"
             }
           }
-        ],
-        "currentTab": 1
+        ]
       }
     ],
     "direction": "vertical"
@@ -194,21 +181,24 @@
       "markdown-importer:Markdownインポーターを開く": false
     }
   },
-  "active": "2c75e17cb94961dd",
+  "active": "d121fd839f11796c",
   "lastOpenFiles": [
-    "note/Image_mzgwppmzgwppmzgw (1).jpg",
-    "dist/src/api/customer/content-types/customer/schema.json",
-    "dist/src/api/customer/content-types/customer",
-    "dist/src/api/customer/content-types",
-    "dist/src/api/translate/routes/translate.js",
-    "dist/src/api/translate/controllers/translate.js",
-    "dist/src/api/translate/routes",
-    "dist/src/api/translate/controllers",
-    "dist/src/api/translate",
-    "dist/src/api/table/content-types/table/schema.json",
-    "dist/src/api/table/content-types/table/lifecycles.js",
-    "note/Dialy/2026-02-26.md",
+    "dist/src/middlewares/store-context.js",
+    "dist/src/middlewares/error-monitor.js",
+    "dist/src/middlewares",
+    "note/pg_marge_back.txt",
+    "note/pg_marge_front.txt",
+    "note/開発Doc/起動：入口案内.md",
+    "note/Dialy/2026-03-02.md",
+    "dist/src/api/module/content-types/module/schema.json",
+    "dist/src/api/module/content-types/module",
+    "dist/src/api/module/content-types",
+    "dist/src/api/module",
+    "dist/src/api/sales-log/content-types/sales-log/schema.json",
+    "dist/src/api/sales-log/content-types/sales-log",
     "note/Dialy/2026-02-28.md",
+    "note/Image_mzgwppmzgwppmzgw (1).jpg",
+    "note/Dialy/2026-02-26.md",
     "note/Dialy/2026-02-25.md",
     "public/uploads/thumbnail_IMG_2821_f201ff3bdc.jpeg",
     "public/uploads/IMG_2821_f201ff3bdc.jpeg",
@@ -225,7 +215,6 @@
     "note/2025-12-06.md",
     "note/2026-02-15.md",
     "note/2026-02-17.md",
-    "note/開発Doc/起動：入口案内.md",
     "2026-02-22.md",
     "note/Dialy/2025-12-07.md"
   ]
