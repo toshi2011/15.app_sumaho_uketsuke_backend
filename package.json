@@ -4,7 +4,7 @@
   "private": true,
   "description": "A Strapi application",
   "scripts": {
-    "build": "strapi build --minify false",
+    "build": "cross-env NODE_OPTIONS=--max-old-space-size=4096 strapi build",
     "console": "strapi console",
     "deploy": "strapi deploy",
     "dev": "strapi develop",
@@ -22,6 +22,7 @@
     "@strapi/plugin-users-permissions": "5.33.0",
     "@strapi/strapi": "5.33.0",
     "better-sqlite3": "12.4.1",
+    "cross-env": "^10.1.0",
     "csv-parse": "^6.1.0",
     "csv-parser": "^3.2.0",
     "handlebars": "^4.7.8",
