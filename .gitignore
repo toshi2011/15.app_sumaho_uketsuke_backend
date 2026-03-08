@@ -155,12 +155,9 @@ pg_marge3.bat
 # Scripts
 ############################
 scripts/*.js
-<<<<<<< HEAD
-=======
 scripts/*.ts
 # Optional: keep specific scripts if needed, but for now ignoring all as requested
 # !scripts/bulk-import-stores.ts
->>>>>>> feature/timeslot-refactor
 *.js
 
 doc/pg_marge_back.txt
