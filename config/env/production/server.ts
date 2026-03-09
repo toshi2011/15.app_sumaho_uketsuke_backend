@@ -9,6 +9,6 @@ export default ({ env }) => ({
     url: env('PUBLIC_URL', 'https://api.your-domain.com'),
     proxy: env.bool('PROXY', true),
     app: {
-        keys: env.array('APP_KEYS'),
+        keys: env.array('APP_KEYS', ['fallback_keyA', 'fallback_keyB', 'fallback_keyC', 'fallback_keyD']),
     },
 });
