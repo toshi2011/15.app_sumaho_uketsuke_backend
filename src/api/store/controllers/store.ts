@@ -69,6 +69,10 @@ export default factories.createCoreController('api::store.store', ({ strapi }) =
 
         const preset = buildCategoryPreset(category);
 
+        // フロントエンドから渡される可能性のある不正なステータス値を正規の列挙型にマッピング
+        let finalStatus = data?.status || 'LEAD';
+        if (finalStatus === 'READ') finalStatus = 'CONTACTED';
+
         const mergedData = {
             ...preset,
             ...data,
@@ -77,7 +81,7 @@ export default factories.createCoreController('api::store.store', ({ strapi }) =
                 ...(data.businessHours || {}),
             },
             // デフォルトのステータスを設定 (Strapi バリデーションエラー回避)
-            status: data?.status || 'LEAD',
+            status: finalStatus,
             // 自動的に公開状態 (Published) にする
             publishedAt: new Date(),
         };
