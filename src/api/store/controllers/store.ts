@@ -76,6 +76,8 @@ export default factories.createCoreController('api::store.store', ({ strapi }) =
                 ...preset.businessHours,
                 ...(data.businessHours || {}),
             },
+            // デフォルトのステータスを設定 (Strapi バリデーションエラー回避)
+            status: data?.status || 'LEAD',
             // 自動的に公開状態 (Published) にする
             publishedAt: new Date(),
         };
