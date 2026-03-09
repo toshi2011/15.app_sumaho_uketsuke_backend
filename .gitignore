@@ -162,3 +162,6 @@ scripts/*.ts
 
 doc/pg_marge_back.txt
 .env.bak
+
+# Obsidian
+.obsidian/
