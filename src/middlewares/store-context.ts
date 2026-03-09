@@ -1,6 +1,7 @@
 /**
  * `store-context` middleware
  * 店舗コンテキストの自動注入とスーパー管理者バイパス機能
+ * + User-Store 所有権検証（テナント分離）
  */
 
 import { Core } from '@strapi/strapi';
@@ -28,6 +29,56 @@ export default (config, { strapi }: { strapi: Core.Strapi }) => {
         }
 
         if (storeId) {
+            // --- 所有権検証: JWT Bearer トークンが存在する場合 ---
+            if (!superAdmin) {
+                const authHeader = ctx.request.header['authorization'];
+                if (authHeader && authHeader.startsWith('Bearer ')) {
+                    const token = authHeader.substring(7);
+                    try {
+                        const payload = await strapi
+                            .plugin('users-permissions')
+                            .service('jwt')
+                            .verify(token);
+
+                        const user = await strapi
+                            .query('plugin::users-permissions.user')
+                            .findOne({
+                                where: { id: payload.id },
+                                populate: ['stores'],
+                            });
+
+                        if (!user) {
+                            return ctx.unauthorized('User not found.');
+                        }
+
+                        const hasAccess =
+                            user.stores &&
+                            user.stores.some(
+                                (store) => store.documentId === storeId
+                            );
+
+                        if (!hasAccess) {
+                            strapi.log.warn(
+                                `[StoreContext] 所有権検証失敗: User ${user.id} は Store ${storeId} へのアクセス権がありません`
+                            );
+                            return ctx.unauthorized(
+                                'You do not have permission to access this store.'
+                            );
+                        }
+
+                        strapi.log.info(
+                            `[StoreContext] 所有権検証OK: User ${user.id} → Store ${storeId}`
+                        );
+                    } catch (err) {
+                        strapi.log.warn(
+                            `[StoreContext] JWT検証失敗: ${(err as Error).message}`
+                        );
+                        // JWT検証失敗時はリクエストを拒否
+                        return ctx.unauthorized('Invalid or expired token.');
+                    }
+                }
+            }
+
             // Set the store context
             ctx.state.storeId = storeId;
 
