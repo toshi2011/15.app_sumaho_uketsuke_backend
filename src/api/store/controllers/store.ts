@@ -44,13 +44,22 @@ export default factories.createCoreController('api::store.store', ({ strapi }) =
      * スーパー管理者による一括店舗作成用（Strapiポリシーガードをバイパス）
      */
     async superAdminCreate(ctx) {
-        const adminKey = ctx.request.headers['x-super-admin-key'] as string | undefined;
-        const validKey = process.env.SUPER_ADMIN_KEY;
+        const rawAdminKey = ctx.request.headers['x-super-admin-key'] as string | undefined;
+        // Check exact match and stripped match
+        const rawValidKey = process.env.SUPER_ADMIN_KEY;
+
+        // Find if there's any key with typo
+        const allEnvKeys = Object.keys(process.env).filter(k => k.includes('SUPER') || k.includes('ADMIN') || k.includes('KEY'));
+
+        const adminKey = rawAdminKey?.trim();
+        const validKey = rawValidKey?.trim();
 
         if (!validKey || adminKey !== validKey) {
             strapi.log.warn(`[StoreController] superAdminCreate 403 Forbidden.`);
-            strapi.log.warn(`  - Provided Header: '${adminKey ? 'SET (Length: ' + adminKey.length + ')' : 'UNDEFINED'}'`);
-            strapi.log.warn(`  - Server Env: '${validKey ? 'SET (Length: ' + validKey.length + ')' : 'UNDEFINED'}'`);
+            strapi.log.warn(`  - Provided Header: '${rawAdminKey ? 'SET (Length: ' + rawAdminKey.length + ')' : 'UNDEFINED'}' (Trimmed: '${adminKey}')`);
+            strapi.log.warn(`  - Server Env exact match: '${rawValidKey ? 'SET (Length: ' + rawValidKey.length + ')' : 'UNDEFINED'}' (Trimmed: '${validKey}')`);
+            strapi.log.warn(`  - Process.env keys resembling SUPER or ADMIN or KEY: ${allEnvKeys.join(', ')}`);
+
             return ctx.forbidden('Invalid Super Admin Key');
         }
 
