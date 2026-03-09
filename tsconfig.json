@@ -38,6 +38,10 @@
     // Do not include plugins in the server compilation
     "src/plugins/**",
     // Do not include scripts
-    "scripts/"
+    "scripts/",
+    // Do not include test files in production build
+    "src/**/__tests__/**",
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts"
   ]
 }
