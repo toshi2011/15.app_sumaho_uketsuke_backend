@@ -44,10 +44,13 @@ export default factories.createCoreController('api::store.store', ({ strapi }) =
      * スーパー管理者による一括店舗作成用（Strapiポリシーガードをバイパス）
      */
     async superAdminCreate(ctx) {
-        const adminKey = ctx.request.headers['x-super-admin-key'];
+        const adminKey = ctx.request.headers['x-super-admin-key'] as string | undefined;
         const validKey = process.env.SUPER_ADMIN_KEY;
 
         if (!validKey || adminKey !== validKey) {
+            strapi.log.warn(`[StoreController] superAdminCreate 403 Forbidden.`);
+            strapi.log.warn(`  - Provided Header: '${adminKey ? 'SET (Length: ' + adminKey.length + ')' : 'UNDEFINED'}'`);
+            strapi.log.warn(`  - Server Env: '${validKey ? 'SET (Length: ' + validKey.length + ')' : 'UNDEFINED'}'`);
             return ctx.forbidden('Invalid Super Admin Key');
         }
 
