@@ -44,7 +44,7 @@ export default [
             // 本番環境では許可するオリジンを明示的に指定
             origin: process.env.CORS_ORIGINS
                 ? process.env.CORS_ORIGINS.split(',')
-                : ['https://your-production-domain.com'],
+                : [process.env.FRONTEND_URL || 'http://localhost:3000', '*'],
             methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'],
             headers: [
                 'Content-Type',
