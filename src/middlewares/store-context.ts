@@ -29,9 +29,14 @@ export default (config, { strapi }: { strapi: Core.Strapi }) => {
             strapi.log.info(`[StoreContext] スーパー管理者アクセス: フィルタ自動注入をバイパス`);
         }
 
+        // /api/stores は「自分がアクセスできる店舗一覧を取得する」エンドポイントなので
+        // 特定 store への所有権チェックは不要（フィルタ注入もスキップ済み）
+        const isStoresList = ctx.request.url.startsWith('/api/stores');
+
         if (storeId) {
             // --- 所有権検証: テナント分離の徹底 ---
-            if (!superAdmin) {
+            // 店舗一覧APIは所有権チェックをスキップ（store-id コンテキスト設定のみ行う）
+            if (!superAdmin && !isStoresList) {
                 const authHeader = ctx.request.header['authorization'];
 
                 // 【強化防御1】オーナーAPIなのに認証ヘッダーがない場合は「強制ブロック」
