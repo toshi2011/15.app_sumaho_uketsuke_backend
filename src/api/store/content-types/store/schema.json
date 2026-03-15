@@ -278,6 +278,12 @@
             "relation": "oneToMany",
             "target": "api::store-module.store-module",
             "mappedBy": "store"
+        },
+        "users": {
+            "type": "relation",
+            "relation": "manyToMany",
+            "target": "plugin::users-permissions.user",
+            "inversedBy": "stores"
         }
     }
 }
